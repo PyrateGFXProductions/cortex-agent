@@ -1,14 +1,11 @@
-import subprocess
-
+from . import sandbox
 from .skills import read_skill
 from .todos import TODO_SCHEMA, write_todos
 
 
 def bash(command: str) -> str:
     """Run a shell command and return its combined stdout and stderr."""
-    result = subprocess.run(
-        command, shell=True, capture_output=True, text=True, timeout=60
-    )
+    result = sandbox.run(command)
     return (result.stdout + result.stderr) or "(no output)"
 
 

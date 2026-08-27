@@ -5,6 +5,7 @@ from . import commands
 from . import session
 from .context import reminder
 from .llm import SYSTEM_PROMPT, call_llm
+from . import sandbox
 from .permissions import check
 from .todos import active_form
 from .tools import TOOLS
@@ -17,7 +18,7 @@ def main():
     parser.add_argument("--debug", action="store_true", help="show the raw model response")
     cli = parser.parse_args()
 
-    ui.banner()
+    ui.banner(sandbox.name())
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if cli.resume:

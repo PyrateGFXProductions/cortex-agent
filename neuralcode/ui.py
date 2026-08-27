@@ -31,13 +31,13 @@ class UI:
 
     # ---------------------------------------------------------------- input
 
-    def banner(self):
+    def banner(self, sandbox_name="none"):
         self.console.print()
         self.console.print(
             Rule(Text(" coding agent ", style=f"bold {ACCENT}"), style=MUTED)
         )
         self.console.print(
-            Padding(Text("ctrl-d to exit", style=MUTED), (0, 0, 0, 2))
+            Padding(Text(f"sandbox: {sandbox_name}  ·  ctrl-d to exit", style=MUTED), (0, 0, 0, 2))
         )
 
     def resumed(self, messages):
