@@ -4,7 +4,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-SESSION_DIR = Path.home() / ".agents" / "sessions"
+PROJECT = str(Path.cwd().resolve()).replace("/", "-")
+SESSION_DIR = Path.home() / ".agents" / "sessions" / PROJECT
 CURRENT = datetime.now().strftime("%Y%m%d-%H%M%S")
 WRITTEN = 0  # how many messages are already on disk
 

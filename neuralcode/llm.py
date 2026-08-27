@@ -3,12 +3,13 @@ import os
 
 from openai import OpenAI
 
-from skills import skills_prompt
-from tools import TOOLS, TOOL_SCHEMAS
+from . import config
+from .skills import skills_prompt
+from .tools import TOOLS, TOOL_SCHEMAS
 
 client = OpenAI(
-    base_url=os.environ["BASE_URL"],
-    api_key=os.environ["API_KEY"],
+    base_url=config.BASE_URL,
+    api_key=config.API_KEY,
 )
 
 SYSTEM_PROMPT = f"""
@@ -28,7 +29,7 @@ If a skill matches what the user wants, call read_skill first and follow it.
 
 def call_llm(messages):
     response = client.chat.completions.create(
-        model="deepseek/deepseek-v4-flash",
+        model=config.MODEL,
         messages=messages,
         tools=TOOL_SCHEMAS,
     )

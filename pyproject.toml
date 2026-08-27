@@ -1,7 +1,7 @@
 [project]
-name = "coding-agent"
+name = "neuralcode"
 version = "0.1.0"
-description = "Add your description here"
+description = "A minimal coding agent"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -9,3 +9,10 @@ dependencies = [
     "pyyaml>=6.0.3",
     "rich>=15.0.0",
 ]
+
+[project.scripts]
+neuralcode = "neuralcode.agent:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
