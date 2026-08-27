@@ -3,6 +3,7 @@ import os
 
 from openai import OpenAI
 
+from skills import skills_prompt
 from tools import TOOLS, TOOL_SCHEMAS
 
 client = OpenAI(
@@ -16,6 +17,11 @@ Use the bash tool to inspect files.
 Answer back to the user once exploration is done.
 
 Your current working directory is: {os.getcwd()}
+
+You have skills available. Each one is a set of instructions for a task.
+If a skill matches what the user wants, call read_skill first and follow it.
+
+{skills_prompt()}
 """
 
 

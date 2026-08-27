@@ -1,5 +1,7 @@
 import subprocess
 
+from skills import read_skill
+
 
 def bash(command: str) -> str:
     """Run a shell command and return its combined stdout and stderr."""
@@ -50,6 +52,23 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_skill",
+            "description": "Open a skill by name and return its full instructions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the skill to open",
+                    }
+                },
+                "required": ["name"],
+            },
+        },
+    },
 ]
 
-TOOLS = {"bash": bash, "read_file": read_file}
+TOOLS = {"bash": bash, "read_file": read_file, "read_skill": read_skill}
