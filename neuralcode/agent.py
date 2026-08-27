@@ -5,6 +5,7 @@ from . import commands
 from . import session
 from .context import reminder
 from .llm import SYSTEM_PROMPT, call_llm
+from .todos import active_form
 from .tools import TOOLS
 from .ui import ui
 
@@ -41,7 +42,7 @@ def main():
             injection = reminder()
             ui.injection(injection["content"])
 
-            with ui.working():
+            with ui.working(active_form()):
                 message, usage = call_llm(messages + [injection])
 
             messages.append(message.model_dump(exclude_none=True))

@@ -7,6 +7,8 @@ stays cached.
 import hashlib
 import subprocess
 from datetime import datetime
+
+from .todos import todos_prompt
 from pathlib import Path
 
 LABELS = {"M": "modified", "D": "deleted", "A": "added", "??": "new"}
@@ -57,6 +59,11 @@ def changes_note():
     )
 
 
+def todos_note():
+    plan = todos_prompt()
+    return f"\n<todos>\n{plan}\n</todos>" if plan else ""
+
+
 def reminder():
     """The block we append to the messages on every turn."""
     return {
@@ -65,6 +72,6 @@ def reminder():
             "<env>\n"
             f"time: {datetime.now():%Y-%m-%d %H:%M}\n"
             f"git branch: {git('branch --show-current').strip() or '(detached)'}\n"
-            "</env>" + changes_note()
+            "</env>" + todos_note() + changes_note()
         ),
     }
