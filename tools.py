@@ -9,6 +9,12 @@ def bash(command: str) -> str:
     return (result.stdout + result.stderr) or "(no output)"
 
 
+def read_file(path: str) -> str:
+    """Read a file and return its contents."""
+    with open(path) as f:
+        return f.read()
+
+
 TOOL_SCHEMAS = [
     {
         "type": "function",
@@ -26,7 +32,24 @@ TOOL_SCHEMAS = [
                 "required": ["command"],
             },
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read a file and return its contents.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to the file to read",
+                    }
+                },
+                "required": ["path"],
+            },
+        },
+    },
 ]
 
-TOOLS = {"bash": bash}
+TOOLS = {"bash": bash, "read_file": read_file}

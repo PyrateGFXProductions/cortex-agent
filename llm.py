@@ -12,10 +12,12 @@ client = OpenAI(
 
 user_input = input("Enter your prompt> ")
 
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = f"""
 You are a coding agent. Your job is to code. Always code.
 Use the bash tool to inspect files.
 Answer back to the user once exploration is done.
+
+Your current working directory is: {os.getcwd()}
 """
 
 response = client.chat.completions.create(
