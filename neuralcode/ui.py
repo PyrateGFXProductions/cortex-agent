@@ -206,6 +206,27 @@ class UI:
         self.console.print(Rule(style=MUTED))
         self.console.print()
 
+    def compacted(self, before, messages):
+        summary = next(
+            (m["content"] for m in messages if "<summary>" in (m.get("content") or "")),
+            "",
+        )
+        self.console.print(
+            Padding(
+                Panel(
+                    Markdown(summary.replace("<summary>", "").replace("</summary>", "")),
+                    title=Text(
+                        f"compacted · {before} → {len(messages)} messages",
+                        style=f"bold {TOOL}",
+                    ),
+                    title_align="left",
+                    border_style=TOOL,
+                    padding=(0, 1),
+                ),
+                (1, 2, 0, 2),
+            )
+        )
+
     def todos(self, todos):
         """The plan, as a checklist. The raw tool output is never worth showing."""
         done = sum(1 for t in todos if t["status"] == "done")

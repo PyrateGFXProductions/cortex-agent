@@ -1,3 +1,4 @@
+from . import history
 from . import sandbox
 from .skills import read_skill
 from .todos import TODO_SCHEMA, write_todos
@@ -6,13 +7,13 @@ from .todos import TODO_SCHEMA, write_todos
 def bash(command: str) -> str:
     """Run a shell command and return its combined stdout and stderr."""
     result = sandbox.run(command)
-    return (result.stdout + result.stderr) or "(no output)"
+    return history.cap((result.stdout + result.stderr) or "(no output)")
 
 
 def read_file(path: str) -> str:
     """Read a file and return its contents."""
     with open(path) as f:
-        return f.read()
+        return history.cap(f.read())
 
 
 def write_file(path: str, content: str) -> str:
