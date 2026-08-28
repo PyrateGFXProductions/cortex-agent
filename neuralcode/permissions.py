@@ -5,7 +5,6 @@ interrupting you for - so read-only commands run silently, and the risky ones
 still stop and ask.
 """
 
-import re
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -55,16 +54,48 @@ BASH_RULES = {
     "git clean*": "deny",
 }
 
-SEPARATORS = re.compile(r"&&|\|\||;|\|")
+def split_command(command):
+    """Split a compound command on the separators that actually separate.
+
+    A naive split on | and ; also cuts inside quotes, so `rg "cap|max"` breaks
+    into fragments that match no rule and fall through to "ask". Anything
+    quoted or backslash-escaped is an argument, not a separator.
+    """
+    parts, current, quote = [], [], None
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote:
+            current.append(char)
+            quote = None if char == quote else quote
+        elif char == "\\":
+            current.append(char)
+            index += 1
+            if index < len(command):
+                current.append(command[index])
+        elif char in "\"'":
+            quote = char
+            current.append(char)
+        elif char in "&|;":
+            parts.append("".join(current))
+            current = []
+            while index + 1 < len(command) and command[index + 1] in "&|":
+                index += 1
+        else:
+            current.append(char)
+        index += 1
+
+    parts.append("".join(current))
+    return [part.strip() for part in parts if part.strip()]
 
 
 def decide(command):
     """Rate every part of a compound command; the strictest verdict wins."""
     verdicts = []
-    for part in SEPARATORS.split(command):
+    for part in split_command(command):
         action = "ask"
         for pattern, rule in BASH_RULES.items():
-            if fnmatch(part.strip(), pattern):
+            if fnmatch(part, pattern):
                 action = rule
         verdicts.append(action)
 

@@ -51,8 +51,14 @@ def sessions(messages):
 
 def compact(messages):
     before = len(messages)
-    with ui.working("compacting"):
-        compacted = compaction.compact(messages)
+    try:
+        with ui.working("compacting"):
+            compacted = compaction.compact(messages)
+    except Exception as failure:  # noqa: BLE001
+        # Compaction is one more API call, and it fires when the window is
+        # nearly full - the worst moment to lose the session over a rate limit.
+        ui.note(f"compaction failed ({type(failure).__name__}); transcript kept as is")
+        return messages
     if len(compacted) == before:
         ui.note("nothing old enough to compact yet")
         return messages
