@@ -1,8 +1,8 @@
 # NeuralCode
 
-A minimal coding agent harness in Python, built to show how the pieces of a coding agent fit together.
+A minimal coding agent harness in Python, built to show how the pieces of a coding agent fit together. 
 
-This is the repo for the Neural Breakdown video on building Codign Agent from scratch. [You can watch the full ~50 minute step-by-step walkthrough here.](https://youtu.be/Lu1UWqVTbQg)
+This is the repo for the Neural Breakdown video on building Codign Agent from scratch. [You can watch the full ~50 minute step-by-step walkthrough here.](https://youtu.be/Lu1UWqVTbQg) You can cycle through individual commits of this repo (other than the README edits) and see how the full project came to life.
 
 https://github.com/user-attachments/assets/e4aaa9e4-69ec-40e3-8f5a-e4ec8c5b7208
 
