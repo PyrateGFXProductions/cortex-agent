@@ -7,10 +7,23 @@ from . import config
 from .skills import skills_prompt
 from .tools import TOOLS, TOOL_SCHEMAS
 
-client = OpenAI(
-    base_url=config.BASE_URL,
-    api_key=config.API_KEY,
-)
+_client = None
+
+
+def _get_client():
+    """Lazy-initialise the OpenAI client.
+
+    Deferred until first call so the setup wizard can write ~/.agents/env
+    and reload config before the client is created with the real credentials.
+    """
+    global _client
+    if _client is None:
+        # Re-read config in case the wizard set os.environ after import time.
+        from . import config as _cfg
+        import importlib
+        importlib.reload(_cfg)
+        _client = OpenAI(base_url=_cfg.BASE_URL, api_key=_cfg.API_KEY)
+    return _client
 
 SYSTEM_PROMPT = f"""
 You are a coding agent. Your job is to code. Always code.
@@ -49,7 +62,7 @@ If a skill matches what the user wants, call read_skill first and follow it.
 
 
 def call_llm(messages, tools=None):
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=config.MODEL,
         messages=messages,
         tools=tools or TOOL_SCHEMAS,

@@ -1,0 +1,134 @@
+name: Release Binaries
+
+# Trigger: push a version tag  →  git tag v0.2.0 && git push --tags
+# Also available via Actions → Run workflow for manual builds.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. v0.2.0)'
+        required: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: cortex-agent-windows.exe
+            binary:   dist/cortex-agent.exe
+          - os: macos-latest
+            artifact: cortex-agent-macos
+            binary:   dist/cortex-agent
+          - os: ubuntu-latest
+            artifact: cortex-agent-linux
+            binary:   dist/cortex-agent
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies + PyInstaller
+        run: uv pip install --system ".[mcp]" pyinstaller
+
+      - name: Build binary
+        run: pyinstaller cortex-agent.spec
+
+      - name: Rename binary (non-Windows)
+        if: runner.os != 'Windows'
+        run: mv dist/cortex-agent ${{ matrix.artifact }}
+
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Move-Item dist/cortex-agent.exe ${{ matrix.artifact }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Get tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: cortex-agent ${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: release-assets/*
+          body: |
+            ## cortex-agent ${{ steps.tag.outputs.tag }}
+
+            ### Download
+
+            | Platform | File |
+            |---|---|
+            | Windows | `cortex-agent-windows.exe` |
+            | macOS   | `cortex-agent-macos` |
+            | Linux   | `cortex-agent-linux` |
+
+            ### First run
+
+            **Windows**: double-click `cortex-agent-windows.exe` — a setup wizard will guide you through adding your API key.
+
+            **macOS**: if Gatekeeper blocks the binary, right-click → Open, or run:
+            ```bash
+            xattr -dr com.apple.quarantine cortex-agent-macos
+            chmod +x cortex-agent-macos
+            ./cortex-agent-macos
+            ```
+
+            **Linux**:
+            ```bash
+            chmod +x cortex-agent-linux
+            ./cortex-agent-linux
+            ```
+
+            ### MCP (Claude Desktop, Cursor, Windsurf)
+            ```bash
+            pip install "cortex-agent[mcp]"
+            ```
+            Then add `{"mcpServers": {"cortex-agent": {"command": "cortex-agent-mcp"}}}` to your client config.
+
+            ### Changelog
+            See [AGENTS.md](AGENTS.md) for what this fork adds over upstream.

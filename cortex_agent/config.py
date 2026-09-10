@@ -11,8 +11,8 @@ if ENV_FILE.exists():
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip())
 
-BASE_URL = os.environ["BASE_URL"]
-API_KEY = os.environ["API_KEY"]
+BASE_URL = os.environ.get("BASE_URL", "")
+API_KEY = os.environ.get("API_KEY", "")
 MODEL = os.environ.get("MODEL", "deepseek/deepseek-v4-flash")
 
 # How much room the model has, and how we spend it.
