@@ -29,7 +29,7 @@ PROFILE = f"""(version 1)
 def wrap(command):
     """Wrap a shell command in an OS sandbox. None means we have no sandbox."""
     if sys.platform == "darwin":
-        profile = Path(tempfile.gettempdir()) / "neuralcode.sb"
+        profile = Path(tempfile.gettempdir()) / "cortex-agent.sb"
         profile.write_text(PROFILE)
         return ["sandbox-exec", "-f", str(profile), "/bin/sh", "-c", command]
 

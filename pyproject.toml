@@ -1,7 +1,7 @@
 [project]
-name = "neuralcode"
-version = "0.1.0"
-description = "A minimal coding agent"
+name = "cortex-agent"
+version = "0.2.0"
+description = "A minimal coding agent harness"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -11,8 +11,12 @@ dependencies = [
     "rich>=15.0.0",
 ]
 
+[project.optional-dependencies]
+mcp = ["mcp>=1.9"]
+
 [project.scripts]
-neuralcode = "neuralcode.agent:main"
+cortex-agent = "cortex_agent.agent:main"
+cortex-agent-mcp = "cortex_agent.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]
