@@ -1,6 +1,7 @@
 # cortex-agent
 
-A minimal, self-contained coding agent harness. Fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB, extended with performance fixes and MCP support.
+A minimal, self-contained coding agent harness.
+Fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB, extended with performance fixes, MCP support, and proper distribution.
 
 ## Working in this repo
 
@@ -68,3 +69,33 @@ Config file locations:
 - **Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Cursor** — `~/.cursor/mcp.json`
 - **Windsurf** — `~/.codeium/windsurf/mcp_settings.json`
+
+## What this fork adds over upstream
+
+### New: MCP server
+`mcp_server.py` exposes the agent's tools — `bash`, `read_file`, `write_file`, `str_replace`,
+`read_skill` — via the Model Context Protocol. Any MCP-compatible client (Claude Desktop,
+Cursor, Windsurf, VS Code via Continue) can call these tools directly with no API key.
+
+### New: Distribution files
+- `install.sh` / `install.ps1` — one-command setup; installs the package, creates `~/.agents/env`
+- `AGENTS.md` (this file) — read automatically by Claude Code, OpenCode, Aider
+
+### Performance fixes applied to upstream code
+
+| File | What changed |
+|---|---|
+| `context.py` | Replaced per-turn MD5 file hashing with `os.stat()` `(mtime, size)`. Cached git branch for the process lifetime. |
+| `history.py` | `locked()` result cached by message list length (O(1) for append-only sessions). `sweep()` registered via `atexit` so spill files clean up on crash. |
+| `session.py` | `all_sessions()` no longer replays entire JSONL files for titles; stops at first user message. |
+| `tools.py` | `str_replace` uses `find()`-based single-pass validation instead of `count()` + `replace()` double-scan. |
+
+### Package renamed
+`neuralcode` → `cortex_agent` (Python package) / `cortex-agent` (CLI command).
+All imports are relative so renaming touched only `pyproject.toml` and two string literals.
+
+### Repository hygiene
+- Removed dead code: `intelligence/pressure_response.py` (referenced non-existent base class)
+- Removed `GLOBAL_DISTRIBUTION_GUIDE.md` (planning document committed by mistake)
+- Added `.vs/` to `.gitignore`
+- Regenerated `uv.lock` to clear duplicate package entry
