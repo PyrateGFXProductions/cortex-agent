@@ -4,7 +4,7 @@ It goes at the END of the message list so the stable prefix in front of it
 stays cached.
 """
 
-import hashlib
+import os
 import subprocess
 from datetime import datetime
 
@@ -12,6 +12,9 @@ from .todos import todos_prompt
 from pathlib import Path
 
 LABELS = {"M": "modified", "D": "deleted", "A": "added", "??": "new"}
+
+# Cached once per process - the branch almost never changes mid-session.
+_BRANCH: str | None = None
 
 
 def git(command):
@@ -21,17 +24,34 @@ def git(command):
     return result.stdout
 
 
-def file_hash(path):
-    file = Path(path)
-    return hashlib.md5(file.read_bytes()).hexdigest() if file.is_file() else None
+def git_branch() -> str:
+    """Return the current branch, fetching once and caching for the session."""
+    global _BRANCH
+    if _BRANCH is None:
+        _BRANCH = git("branch --show-current").strip() or "(detached)"
+    return _BRANCH
+
+
+def file_stat(path: str):
+    """Return (mtime, size) for change detection - O(1) vs O(file_size) for MD5.
+
+    Git itself uses this same optimisation: it only re-hashes a blob when the
+    inode, mtime, or size has changed. We do the same here because we only
+    need to know *that* something changed, not *what* the new hash is.
+    """
+    try:
+        st = os.stat(path)
+        return (st.st_mtime, st.st_size)
+    except OSError:
+        return None
 
 
 def git_state():
-    """path -> (status, content hash) for every file git sees as changed."""
+    """path -> (git-status-code, (mtime, size)) for every file git sees as changed."""
     state = {}
     for line in git("status --porcelain").splitlines():
         path = line[3:]
-        state[path] = (line[:2].strip(), file_hash(path))
+        state[path] = (line[:2].strip(), file_stat(path))
     return state
 
 
@@ -39,7 +59,7 @@ LAST_STATE = git_state()
 
 
 def file_changes():
-    """Files whose status or contents moved since the previous turn."""
+    """Files whose status or stat moved since the previous turn."""
     global LAST_STATE
     now = git_state()
     changed = {p: v[0] for p, v in now.items() if LAST_STATE.get(p) != v}
@@ -71,7 +91,7 @@ def reminder():
         "content": (
             "<env>\n"
             f"time: {datetime.now():%Y-%m-%d %H:%M}\n"
-            f"git branch: {git('branch --show-current').strip() or '(detached)'}\n"
+            f"git branch: {git_branch()}\n"
             "</env>" + todos_note() + changes_note()
         ),
     }

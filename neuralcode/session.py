@@ -76,6 +76,27 @@ def title(messages):
     return "(empty)"
 
 
+def title_from_file(path: Path) -> str:
+    """Extract the session title without loading the entire file.
+
+    Scans forward line by line and stops the moment it finds the first user
+    message. For a session with many turns this avoids replaying the whole
+    transcript just to produce a 60-char label.
+    """
+    try:
+        with path.open() as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(entry, dict) and entry.get("role") == "user":
+                    return " ".join(str(entry.get("content") or "").split())[:60]
+    except OSError:
+        pass
+    return "(empty)"
+
+
 def all_sessions():
     """Newest first."""
     if not SESSION_DIR.exists():
@@ -83,4 +104,4 @@ def all_sessions():
     files = sorted(
         SESSION_DIR.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True
     )
-    return [{"id": p.stem, "title": title(load(p.stem))} for p in files]
+    return [{"id": p.stem, "title": title_from_file(p)} for p in files]

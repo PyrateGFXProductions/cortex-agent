@@ -37,20 +37,35 @@ def write_file(path: str, content: str) -> str:
 
 
 def str_replace(path, old_str, new_str, allow_multi_edit=False):
-    """Swap exact text in a file. old_str must match exactly once."""
+    """Swap exact text in a file. old_str must match exactly once.
+
+    Uses a single forward scan via str.find() to locate and validate the
+    match before writing, avoiding the double-traverse that count()+replace()
+    would do on large files.
+    """
     with open(path) as f:
         content = f.read()
 
-    count = content.count(old_str)
-    if count == 0:
+    first = content.find(old_str)
+    if first == -1:
         return f"Error: old_str was not found in {path}"
-    if count > 1 and not allow_multi_edit:
-        return (
-            f"Error: old_str matches {count} times in {path}. "
-            "Add surrounding lines to make it unique, "
-            "or set allow_multi_edit to replace them all."
-        )
 
+    if not allow_multi_edit:
+        second = content.find(old_str, first + len(old_str))
+        if second != -1:
+            count = content.count(old_str)
+            return (
+                f"Error: old_str matches {count} times in {path}. "
+                "Add surrounding lines to make it unique, "
+                "or set allow_multi_edit to replace them all."
+            )
+        new_content = content[:first] + new_str + content[first + len(old_str):]
+        with open(path, "w") as f:
+            f.write(new_content)
+        return f"Replaced 1 match in {path}"
+
+    # allow_multi_edit: replace all occurrences in one pass
+    count = content.count(old_str)
     with open(path, "w") as f:
         f.write(content.replace(old_str, new_str))
     return f"Replaced {count} match(es) in {path}"

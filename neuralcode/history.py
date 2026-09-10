@@ -30,6 +30,10 @@ TRIMMED = "[output trimmed:"  # marker, so stripping twice is a no-op
 SUMMARY = "<summary>"  # marks the handoff note compaction leaves behind
 SPILLS = []  # temp files belonging to the current turn
 
+# Cache for locked(): keyed on len(messages) so it auto-invalidates when the
+# list grows (new message appended) or shrinks (/rewind, compaction).
+_LOCKED_CACHE: dict[int, int] = {}
+
 
 # ------------------------------------------------------------------- 1. cap
 
@@ -70,14 +74,34 @@ def sweep():
     SPILLS.clear()
 
 
+# Register sweep as an atexit handler so spill files are removed even when
+# the session is killed mid-turn (ctrl-c, OOM, etc.). Calling it again at
+# normal turn-end is harmless - unlink(missing_ok=True) is idempotent.
+import atexit as _atexit
+_atexit.register(sweep)
+
+
 def locked(messages):
     """Length of the frozen prefix - everything up to and including the newest
     summary. Derived rather than remembered, so it stays correct across
-    /compact, /rewind and switching sessions."""
-    for index in range(len(messages) - 1, -1, -1):
+    /compact, /rewind and switching sessions.
+
+    Result is cached by list length. The summary marker never moves once
+    compaction has run, and appending new messages only grows the list, so
+    a cached value for length N is still valid for length N+k - unless a
+    rewind or compaction shrinks the list, at which point the key misses and
+    we re-scan. This keeps the common case (append-only) at O(1).
+    """
+    key = len(messages)
+    if key in _LOCKED_CACHE:
+        return _LOCKED_CACHE[key]
+    result = 0
+    for index in range(key - 1, -1, -1):
         if SUMMARY in (messages[index].get("content") or ""):
-            return index + 1
-    return 0
+            result = index + 1
+            break
+    _LOCKED_CACHE[key] = result
+    return result
 
 
 # ----------------------------------------------------------------- 2. strip
