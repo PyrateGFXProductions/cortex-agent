@@ -62,6 +62,31 @@ uv sync
 uv run cortex-agent
 ```
 
+## Installation Methods
+
+See [README.md#installation-methods](README.md#installation-methods) for comprehensive options:
+
+| Method | Best For |
+|--------|----------|
+| **Standard (uv)** | Local development, contributing |
+| **Docker** | CI/CD, reproducible envs, isolation |
+| **Package Managers** (Homebrew, Scoop, Chocolatey, AUR, Nix) | Quick system-wide install |
+| **Binary Releases** | Air-gapped, no toolchain, CI runners |
+| **Kubernetes/Helm** | Production, team clusters, GitOps |
+| **Devcontainers** | VS Code Remote, Codespaces, team consistency |
+| **Cloud GPU** (RunPod, Lambda, Modal) | No local GPU, burst workloads |
+| **Air-gapped/Offline** | Secure/classified environments |
+| **Multi-user/Shared** | Team servers, shared GPU nodes |
+
+**Quick decision:**
+- Local dev → `uv sync`
+- CI/reproducible → Docker
+- No build → Binary/Package manager
+- Production K8s → Helm
+- Remote dev → Devcontainer
+- No GPU → Cloud GPU
+- Offline → Air-gapped bundle
+
 ## MCP (use with Claude Desktop, Cursor, Windsurf, etc.)
 
 ```bash
@@ -216,6 +241,14 @@ This project builds on exceptional work from the open-source community. Full att
 - **llama.cpp** — CPU/GPU GGUF inference engine
 - **PyTorch, Rich, Prompt Toolkit, uv** — Python ecosystem foundations
 - **MCP (Anthropic)** — Model Context Protocol for tool exposure
+
+---
+
+## Support
+
+If cortex-agent has been useful to your workflow, consider supporting continued development:
+
+[![Support me on Ko-fi](https://img.shields.io/badge/Support%20me%20on-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/pyrategfxproductions)
 
 ---
 

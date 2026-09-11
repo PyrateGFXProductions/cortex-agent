@@ -1,10 +1,37 @@
 # cortex-agent
 
-A **reference implementation of context-window efficiency patterns** for AI coding agents.
+> **Reference implementation of context-window efficiency patterns for AI coding agents** — locked prefix + late injection, three-tier tool output degradation, compaction with prefix rebuild, isolated subagents, file staleness detection — plus a hardware-aware smart installer for local LLM inference stacks (vLLM+LMCache, Ollama, llama.cpp).
 
-Originally a minimal, self-contained coding agent harness (fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB). Now primarily serves as **documented, portable patterns** that can be applied to any client: opencode, hermes, claude-code, aider, etc.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Built with uv](https://img.shields.io/badge/built%20with-uv-DE5FE9.svg)](https://docs.astral.sh/uv/)
 
-The standalone agent (`uv run cortex-agent`) still works and demonstrates all patterns in action.
+---
+
+## What is this?
+
+**cortex-agent** began as a minimal, self-contained coding agent harness (fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB). It has evolved into a **reference implementation of context-window efficiency patterns** — documented, portable techniques that can be applied to any AI coding client (opencode, hermes, claude-code, aider, etc.).
+
+The standalone agent (`uv run cortex-agent`) still works and demonstrates all patterns in action. But the primary value is the **architecture** — five core efficiency patterns plus a hardware-aware installer — that other clients can adopt.
+
+---
+
+## Efficiency Patterns (Portable to Any Client)
+
+See [`EFFICIENCY_PATTERNS.md`](EFFICIENCY_PATTERNS.md) for complete documentation.
+
+| Pattern | What It Solves | Key Insight |
+|---------|----------------|-------------|
+| **1. Locked Prefix + Late Injection** | Prompt cache invalidation | Never mutate cached messages; inject env context (time, git, todos) as ephemeral tail message at send time |
+| **2. Three-Tier Tool Output Degradation** | Context window overflow | Cap (10K) → Strip (300 chars) → Drop (emergency) — progressive, idempotent, cache-safe |
+| **3. Compaction with Prefix Rebuild** | Long sessions | Summarize at 85% full, rebuild to 35%, new `system + summary` becomes locked prefix |
+| **4. Isolated Subagents** | Exploration token burn | Fresh context window, read-only tools, 12-turn cap, only final answer returns |
+| **5. File Staleness Detection** | Stale reads | `os.stat(mtime, size)` diff per turn, warns agent before editing changed files |
+
+**Additional patterns implemented:**
+- **Pattern 6: Hardware-Aware Automatic Configuration** — Detects GPU/CPU/RAM, maps to 5 profiles, auto-configures context window, quantization, GPU memory, CPU offload
+- **Pattern 7: Interactive Smart Installer** — Cross-platform installer that detects hardware, presents options interactively, installs optimal local LLM stack
 
 ---
 
@@ -17,27 +44,20 @@ The standalone agent (`uv run cortex-agent`) still works and demonstrates all pa
 git clone https://github.com/PyrateGFXProductions/cortex-agent
 cd cortex-agent
 uv sync
-```
 
-Create `~/.agents/env` with your API credentials:
-
-```bash
+# Create ~/.agents/env with your API credentials
+cat > ~/.agents/env << 'EOF'
 BASE_URL=https://openrouter.ai/api/v1
 API_KEY=sk-or-...
 MODEL=deepseek/deepseek-chat-v3-0324   # optional, this is the default
-```
+EOF
 
-Run:
-
-```bash
 uv run cortex-agent
-# or, after uv tool install .:
-cortex-agent
 ```
 
 ### Local LLM Inference Stack (Smart Installer)
 
-Install an optimal local LLM stack (vLLM+LMCache, Ollama, or llama.cpp) automatically:
+Install an optimal local LLM stack (vLLM+LMCache, Ollama, or llama.cpp) with LMCache KV cache offloading:
 
 ```bash
 # Linux/macOS
@@ -46,11 +66,109 @@ Install an optimal local LLM stack (vLLM+LMCache, Ollama, or llama.cpp) automati
 # Windows PowerShell
 .\smart-install.ps1
 
-# Preview what would be installed
+# Preview what would be installed (no changes)
 python smart_installer/smart_install.py --dry-run --no-rich
 ```
 
 This detects your hardware and installs the optimal stack with LMCache for KV cache offloading.
+
+---
+
+## Installation Methods
+
+Choose the method that fits your environment:
+
+| Method | Best For | Command |
+|--------|----------|---------|
+| **Standard (uv)** | Local development, contributing | `uv sync` |
+| **Docker** | CI/CD, reproducible envs, isolation | `docker run ...` |
+| **Package Managers** | Quick system-wide install | `brew install ...` / `scoop install ...` |
+| **Binary Releases** | Air-gapped, no toolchain, CI runners | `curl ... / cortex-agent` |
+| **Kubernetes/Helm** | Production, team clusters, GitOps | `helm install ...` |
+| **Devcontainers** | VS Code Remote, Codespaces, team consistency | "Reopen in Container" |
+| **Cloud GPU** (RunPod, Lambda, Modal) | No local GPU, burst workloads | SSH + smart installer |
+| **Air-gapped/Offline** | Secure/classified environments | `pip download --offline` |
+| **Multi-user/Shared** | Team servers, shared GPU nodes | System-wide install |
+
+### Docker
+
+**CPU-only (works everywhere):**
+```bash
+docker run -it --rm \
+  -v ~/.agents:/home/agent/.agents \
+  -v $(pwd):/workspace \
+  ghcr.io/pyrategfxproductions/cortex-agent:latest
+```
+
+**GPU (NVIDIA, requires nvidia-container-toolkit):**
+```bash
+docker run -it --rm --gpus all \
+  -v ~/.agents:/home/agent/.agents \
+  -v $(pwd):/workspace \
+  ghcr.io/pyrategfxproductions/cortex-agent:cuda-latest
+```
+
+**With local LLM stack (vLLM + LMCache) via compose:**
+```yaml
+# docker-compose.yml
+services:
+  cortex-agent:
+    image: ghcr.io/pyrategfxproductions/cortex-agent:cuda-latest
+    runtime: nvidia
+    environment:
+      - BASE_URL=http://vllm:8000/v1
+      - API_KEY=dummy
+      - MODEL=local-model
+    volumes:
+      - ~/.agents:/home/agent/.agents
+      - ./workspace:/workspace
+    depends_on:
+      - vllm
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    command: >
+      --model meta-llama/Llama-3.1-8B-Instruct
+      --gpu-memory-utilization 0.85
+      --max-model-len 32768
+      --enable-prefix-caching
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+### Package Managers
+
+| Platform | Command |
+|----------|---------|
+| **macOS (Homebrew)** | `brew install pyrategfxproductions/tap/cortex-agent` |
+| **Windows (Scoop)** | `scoop bucket add pyrategfx https://github.com/PyrateGFXProductions/scoop-bucket && scoop install cortex-agent` |
+| **Windows (Chocolatey)** | `choco install cortex-agent` |
+| **Arch Linux (AUR)** | `yay -S cortex-agent-git` |
+| **Nix** | `nix run github:PyrateGFXProductions/cortex-agent` |
+
+### Binary Releases
+
+```bash
+# Linux x86_64
+curl -L -o cortex-agent https://github.com/PyrateGFXProductions/cortex-agent/releases/latest/download/cortex-agent-linux-x86_64
+chmod +x cortex-agent && ./cortex-agent
+
+# macOS (Apple Silicon)
+curl -L -o cortex-agent https://github.com/PyrateGFXProductions/cortex-agent/releases/latest/download/cortex-agent-macos-arm64
+chmod +x cortex-agent && ./cortex-agent
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/PyrateGFXProductions/cortex-agent/releases/latest/download/cortex-agent-windows-x86_64.exe" -OutFile "cortex-agent.exe"
+.\cortex-agent.exe
+```
 
 ---
 
@@ -74,122 +192,69 @@ Add to your MCP client config:
 }
 ```
 
-| Client | Config file |
-|---|---|
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Cursor | `~/.cursor/mcp.json` |
-| Windsurf | `~/.codeium/windsurf/mcp_settings.json` |
+| Client | Config File |
+|--------|-------------|
+| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| **Cursor** | `~/.cursor/mcp.json` |
+| **Windsurf** | `~/.codeium/windsurf/mcp_settings.json` |
 
 The MCP server exposes: `bash`, `read_file`, `write_file`, `str_replace`, `read_skill`.
 
 ---
 
-## Features
+## Smart Installer (Local LLM Stack)
 
-### Core Agent (cortex_agent/)
-- Interactive terminal chat with syntax-highlighted output
-- Tools: shell commands, file read/write, targeted edits, skill files, subagents
-- Permissions layer: allow/ask/deny rules for bash commands
-- Shell sandbox on macOS (seatbelt) and Linux (bubblewrap); graceful fallback on Windows
-- Skills loaded from `~/.agents/skills/` and `.agents/skills/`
-- Subagents: exploration in a separate context window — findings only come back
-- Todo tracking for multi-step tasks, re-injected every turn
-- Saved sessions with `/sessions`, `/rewind`, `/compact`
-- Automatic context compaction (85% → 35%) preserving prefix cache
-- Git branch and stale-file alerts injected before each LLM call
-- MCP server for Claude Desktop, Cursor, Windsurf, and other clients
+Cross-platform interactive installer that detects your hardware and installs the optimal local LLM inference stack with LMCache:
 
-### Efficiency Patterns (Portable to Any Client)
-See [`EFFICIENCY_PATTERNS.md`](EFFICIENCY_PATTERNS.md) for the five core patterns:
-1. **Locked Prefix + Late Injection** — preserve prompt cache by never mutating cached messages
-2. **Three-Tier Tool Output Degradation** — cap (10K) → strip (300 chars) → drop (emergency)
-3. **Compaction with Prefix Rebuild** — summarize at 85% full, rebuild to 35%, new prefix cached
-4. **Isolated Subagents** — fresh context window, read-only tools, 12-turn cap, only final answer returns
-5. **File Staleness Detection** — `os.stat(mtime, size)` diff per turn, warn on stale reads
-
-### Opencode Patch (Private)
-The `../opencode-efficiency-patch/` applies all patterns to opencode:
-- Hardware-aware automatic configuration (5 hardware profiles)
-- Late injection, locked prefix, compaction trigger from config
-- Bash 30K→10K, View 250KB→100KB/2000→500
-- Task agent: 12-turn cap, no write tools, no subagents
-- File staleness detection via `os.stat(mtime, size)`
-
-### Smart Installer (New)
-Cross-platform interactive installer for local LLM inference:
 ```bash
-./smart-install.sh          # Linux/macOS
-.\smart-install.ps1         # Windows
-python smart_installer/smart_install.py --dry-run --no-rich  # Preview
-```
-- Detects hardware → recommends optimal stack (vLLM+LMCache, Ollama, llama.cpp)
-- Interactive, user-controlled installation with confirmations
-- Generates client configs for cortex-agent, opencode, Continue.dev
-- Creates system services (systemd, launchd, Task Scheduler)
+# Linux/macOS
+./smart-install.sh
 
-### WSL2 + vLLM + LMCache (Windows)
-For vLLM + LMCache on Windows (requires Linux):
+# Windows PowerShell
+.\smart-install.ps1
+
+# Preview only
+python smart_installer/smart_install.py --dry-run --no-rich
+```
+
+**What it does:**
+1. **Detects hardware** — GPU vendor/model/VRAM, CPU, RAM, OS
+2. **Shows hardware summary** — asks for confirmation
+3. **Interactive stack selection** — vLLM+LMCache (NVIDIA/AMD GPU), Ollama (Apple Silicon/Windows), llama.cpp (CPU-only)
+4. **Interactive additional components** — CUDA/ROCm, Python venv, model pre-download, auto-start service
+5. **Shows complete plan** — final confirmation before any installation
+6. **Installs with progress** — generates all configs, services, client configs
+
+**Hardware profiles & recommendations:**
+
+| Your Hardware | Recommended Stack | Quantization | Context |
+|---------------|-------------------|--------------|---------|
+| RTX 4090 (24GB) | vLLM + LMCache | FP16 | 128K+ |
+| RTX 3080/4080 (10-16GB) | vLLM + LMCache | FP16/8bit | 32-64K |
+| RTX 3060/4060 (8-12GB) | vLLM + LMCache | 8bit/4bit | 16-32K |
+| MacBook Pro M3 Max (96GB) | Ollama | Q4_K_M | 64K |
+| MacBook Air M2 (16GB) | Ollama | Q4_K_M | 16K |
+| No GPU (32GB RAM) | llama.cpp | Q4_K_M | 8-16K |
+
+---
+
+## WSL2 + vLLM + LMCache (Windows)
+
+For Windows users wanting vLLM + LMCache (requires Linux):
+
 ```powershell
 .\setup-wsl2-lmcache.ps1          # First run: installs WSL2, prompts reboot
 .\setup-wsl2-lmcache.ps1 -SkipWSLInstall  # After reboot: completes inside WSL
 ```
+
 See [`WSL2-LMCACHE-SETUP.md`](WSL2-LMCACHE-SETUP.md) for details.
-
----
-
-## Skills
-
-Skills are markdown instruction files the agent loads on demand. Drop them in:
-
-```
-~/.agents/skills/<name>/SKILL.md
-.agents/skills/<name>/SKILL.md   # project-local
-```
-
-The agent sees the name and description in its system prompt and calls `read_skill` when it needs the full instructions.
-
----
-
-## Changes from upstream
-
-This fork ([avbiswas/neural-code](https://github.com/avbiswas/neural-code)) adds the following on top of the original tutorial codebase:
-
-### Package identity
-- Renamed Python package from `neuralcode` to `cortex_agent`; CLI command from `neuralcode` to `cortex-agent`
-- Version bumped to `0.2.0`
-
-### MCP server (`cortex_agent/mcp_server.py`) — new file
-- Exposes `bash`, `read_file`, `write_file`, `str_replace`, `read_skill` via the Model Context Protocol
-- Works with Claude Desktop, Cursor, Windsurf, VS Code (Continue), and any other MCP-compatible client
-- Zero API key required — the MCP server only runs local tools; the client's own LLM handles the AI side
-- Installed as a separate entry point: `cortex-agent-mcp`
-
-### Distribution files — new files
-- `AGENTS.md` — read automatically by Claude Code, OpenCode, Aider, and other harnesses
-- `install.sh` / `install.ps1` — one-command setup for Mac/Linux/Windows; creates `~/.agents/env`, prints MCP config snippet
-
-### Performance fixes (`context.py`, `history.py`, `session.py`, `tools.py`)
-
-| File | Issue | Fix |
-|---|---|---|
-| `context.py` | MD5 hash of every git-changed file on every turn | `os.stat()` `(mtime, size)` — same semantics, O(1) per file |
-| `context.py` | `git branch` subprocess on every turn | Cached in `_BRANCH` after first call |
-| `history.py` | `locked()` full reverse-scan on every `strip()`/`fit()` call | Dict cache keyed on `len(messages)`; O(1) for append-only sessions |
-| `history.py` | Temp spill files left on disk if session is killed mid-turn | `atexit.register(sweep)` guarantees cleanup on any exit |
-| `session.py` | `all_sessions()` fully replayed every JSONL file to get a title | `title_from_file()` stops at the first user message line |
-| `tools.py` | `str_replace` double-scanned file with `count()` then `replace()` | `find()`-based single-pass validation; slice-concat write |
-
-### Repository hygiene
-- Removed dead code: `neuralcode/intelligence/` (pressure_response.py referenced a non-existent base class), `GLOBAL_DISTRIBUTION_GUIDE.md` (planning document committed by mistake)
-- Added `.vs/` to `.gitignore`
-- Regenerated `uv.lock` to eliminate duplicate package entry
 
 ---
 
 ## Documentation
 
 | File | Description |
-|---|---|
+|------|-------------|
 | [`AGENTS.md`](AGENTS.md) | Complete project documentation for AI harnesses |
 | [`EFFICIENCY_PATTERNS.md`](EFFICIENCY_PATTERNS.md) | Five core patterns + hardware-aware config + smart installer |
 | [`WSL2-LMCACHE-SETUP.md`](WSL2-LMCACHE-SETUP.md) | WSL2 + vLLM + LMCache setup for Windows |
@@ -199,34 +264,45 @@ This fork ([avbiswas/neural-code](https://github.com/avbiswas/neural-code)) adds
 
 ## Credits & Attribution
 
-This project stands on the shoulders of giants. We gratefully acknowledge the following projects and authors:
+This project builds on exceptional work from the open-source community:
 
 ### Core Inspiration & Base Code
-- **[neuralcode / neural-code](https://github.com/avbiswas/neural-code)** by **AVB (Avik Biswas)** — The original minimal coding agent harness and [Neural Breakdown tutorial](https://youtu.be/Lu1UWqVTbQg) that started this fork. The tutorial's commit-by-commit walkthrough is an exceptional educational resource for understanding how coding agents work from first principles.
+- **[neuralcode / neural-code](https://github.com/avbiswas/neural-code)** by **AVB (Avik Biswas)** — The original minimal coding agent harness and [Neural Breakdown tutorial](https://youtu.be/Lu1UWqVTbQg). The tutorial's commit-by-commit walkthrough is an exceptional educational resource.
 
 ### AI Coding Agent Ecosystem
-- **[opencode](https://github.com/opencode-ai/opencode)** (now [charmbracelet/crush](https://github.com/charmbracelet/crush)) — The Go-based AI coding agent whose architecture inspired the efficiency pattern port; a production-grade reference for agent loops, tool systems, and session management.
-- **[MCP (Model Context Protocol)](https://modelcontextprotocol.io/)** by **Anthropic** — The open protocol enabling tool exposure to Claude Desktop, Cursor, Windsurf, and other clients.
+- **[opencode](https://github.com/opencode-ai/opencode)** (now [charmbracelet/crush](https://github.com/charmbracelet/crush)) — Go-based AI coding agent; architecture reference for efficiency pattern port.
+- **[MCP (Model Context Protocol)](https://modelcontextprotocol.io/)** by **Anthropic** — Open protocol for tool exposure to Claude Desktop, Cursor, Windsurf.
 
 ### Local LLM Inference Stack
-- **[vLLM](https://github.com/vllm-project/vllm)** by **vLLM Team** — High-throughput LLM serving engine with PagedAttention, continuous batching, and prefix caching. The foundation for GPU-accelerated local inference.
-- **[LMCache](https://github.com/LMCache/LMCache)** by **LMCache Team (Yihua Cheng, Yuhan Liu, et al.)** — KV cache management layer enabling persistent, tiered cache offloading and reuse across requests/sessions. Critical for multi-turn agentic workloads.
-- **[Ollama](https://github.com/ollama/ollama)** by **Ollama Team** — Native cross-platform LLM runner with excellent quantization support and simple UX. The go-to for Apple Silicon and Windows native inference.
-- **[llama.cpp](https://github.com/ggerganov/llama.cpp)** by **Georgi Gerganov** — The foundational CPU/GPU inference engine via GGUF. Enables local LLMs on virtually any hardware.
+- **[vLLM](https://github.com/vllm-project/vllm)** by **vLLM Team** — High-throughput LLM serving with PagedAttention, continuous batching, prefix caching.
+- **[LMCache](https://github.com/LMCache/LMCache)** by **LMCache Team (Yihua Cheng, Yuhan Liu, et al.)** — KV cache management layer for persistent, tiered cache offloading.
+- **[Ollama](https://github.com/ollama/ollama)** by **Ollama Team** — Native cross-platform LLM runner with excellent quantization support.
+- **[llama.cpp](https://github.com/ggerganov/llama.cpp)** by **Georgi Gerganov** — Foundational CPU/GPU inference engine via GGUF.
 
 ### Python Ecosystem
-- **[PyTorch](https://pytorch.org/)** by **PyTorch Team (Meta AI)** — The tensor computation backbone for vLLM, LMCache, and model loading.
-- **[Rich](https://github.com/Textualize/rich)** by **Textualize (Will McGugan)** — Beautiful terminal formatting, tables, progress bars, and interactive UI for the smart installer.
-- **[Prompt Toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit)** by **Jonathan Slenders** — Advanced interactive input with history, auto-completion, and key bindings for the agent REPL.
-- **[OpenAI Python SDK](https://github.com/openai/openai-python)** by **OpenAI** — The standard client interface for OpenAI-compatible APIs (used by all local inference servers).
-- **[uv](https://github.com/astral-sh/uv)** by **Astral (Charlie Marsh)** — Fast Python package installer and resolver; replaces pip/venv/pipx for modern Python workflows.
+- **[PyTorch](https://pytorch.org/)** by **PyTorch Team (Meta AI)** — Tensor computation backbone for vLLM, LMCache.
+- **[Rich](https://github.com/Textualize/rich)** by **Textualize (Will McGugan)** — Beautiful terminal formatting, tables, progress bars.
+- **[Prompt Toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit)** by **Jonathan Slenders** — Advanced interactive input for the agent REPL.
+- **[OpenAI Python SDK](https://github.com/openai/openai-python)** by **OpenAI** — Standard client for OpenAI-compatible APIs.
+- **[uv](https://github.com/astral-sh/uv)** by **Astral (Charlie Marsh)** — Fast Python package installer and resolver.
 
 ### Infrastructure & Protocols
-- **[Hugging Face Hub](https://huggingface.co/)** — Model hosting, versioning, and distribution; the standard for open-weight model access.
-- **[Git](https://git-scm.com/)** — Version control; used for repo detection, branch awareness, and session history.
+- **[Hugging Face Hub](https://huggingface.co/)** — Model hosting, versioning, distribution.
+- **[Git](https://git-scm.com/)** — Version control; repo detection, branch awareness.
 
-### Educational Resources
-- **[Neural Breakdown](https://www.youtube.com/@NeuralBreakdown)** by **AVB** — Deep-dive video series on building coding agents from scratch. Highly recommended for anyone wanting to understand the internals.
+---
+
+## Support This Project
+
+If cortex-agent has been useful to your workflow, consider supporting continued development:
+
+[![Support me on Ko-fi](https://img.shields.io/badge/Support%20me%20on-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/pyrategfxproductions)
+
+[![YouTube](https://img.shields.io/badge/YouTube-PyrateGFXProductions-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@PyrateGFXProductions)
+[![YouTube](https://img.shields.io/badge/YouTube-TwigandBerries-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@TwigandBerries)
+[![Civitai](https://img.shields.io/badge/Civitai-PyrateGFXProductions-6D28D9?style=for-the-badge&logo=civitai&logoColor=white)](https://civitai.com/user/PyrateGFXProductions)
+
+Your support helps fund new features, pattern research, and keeping the project maintained and free for everyone.
 
 ---
 
@@ -236,8 +312,14 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## Support
+## Disclaimer
 
-If you find this useful, consider supporting the original creator on Patreon:
+This software is provided "as is," without warranty of any kind, express or implied. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability.
 
-[![Become a Patron](https://c5.patreon.com/external/logo/become_a_patron_button.png)](https://www.patreon.com/NeuralBreakdownwithAVB)
+- **AI-generated content:** Output from integrated LLMs is generated by AI models. You are solely responsible for how you use, publish, or distribute AI-generated output.
+- **Not affiliated:** This project is independent. Not affiliated with, endorsed by, or connected to any model vendor unless explicitly stated.
+- **Model licensing:** When downloading models through the smart installer or running local inference, review each model's license before commercial use.
+
+---
+
+*Built with obsessive attention to detail by PyrateGFX Productions.*
