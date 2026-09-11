@@ -1,5 +1,7 @@
 # cortex-agent
 
+[![cortex-agent](PGFX_Cortex_Agent_logo.jpg)](PGFX_Cortex_Agent_logo.jpg)
+
 > **Reference implementation of context-window efficiency patterns for AI coding agents** — locked prefix + late injection, three-tier tool output degradation, compaction with prefix rebuild, isolated subagents, file staleness detection — plus a hardware-aware smart installer for local LLM inference stacks (vLLM+LMCache, Ollama, llama.cpp).
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
