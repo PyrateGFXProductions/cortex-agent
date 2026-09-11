@@ -114,3 +114,111 @@ All imports are relative so renaming touched only `pyproject.toml` and two strin
 - Removed `GLOBAL_DISTRIBUTION_GUIDE.md` (planning document committed by mistake)
 - Added `.vs/` to `.gitignore`
 - Regenerated `uv.lock` to clear duplicate package entry
+
+---
+
+## Enhanced: Hardware-Aware Configuration (opencode patch)
+
+The private opencode patch at `../opencode-efficiency-patch/` adds **hardware-aware automatic configuration** that detects your GPU/CPU/RAM and sets optimal defaults:
+
+| Hardware Profile | GPU VRAM | System RAM | Stack | Context | Quantization | CPU Offload |
+|---|---|---|---|---|---|---|
+| High-End | ≥24GB | ≥64GB | vLLM+LMCache | 128K+ | FP16 | 64GB |
+| Mid-Range | 8-24GB | 32-64GB | vLLM+LMCache | 32-64K | FP16/8-bit | 32GB |
+| Entry | 4-8GB | 16-32GB | vLLM+LMCache | 16-32K | 4-bit/8-bit | 16GB |
+| Apple Silicon | Unified | ≥32GB | Ollama | 32K | Q4_K_M | 50% RAM |
+| CPU Only | None | ≥16GB | llama.cpp | 8-16K | Q4_K_M | N/A |
+
+### Opencode Patch Enhancements
+
+The patch applies all 5 efficiency patterns to opencode (Go):
+
+| Component | Enhancement |
+|---|---|
+| `internal/message/message.go` | `StripToolResults()` — post-turn strip to 300-char stubs; `FindLockedPrefix()` — O(1) locked prefix detection |
+| `internal/llm/agent/agent.go` | Late injection (`buildLateInjection()`), turn-loop compaction trigger, `maxTurns` for task agent |
+| `internal/llm/prompt/coder.go` | Removed env info from system prompt (moved to late injection) |
+| `internal/llm/prompt/task.go` | Rewritten for strict isolation (no write tools, no subagents, 12-turn cap) |
+| `internal/llm/tools/bash.go` | `MaxOutputLength` 30K → 10K (cap phase) |
+| `internal/llm/tools/view.go` | `MaxReadSize` 250KB → 100KB, `DefaultReadLimit` 2000 → 500 (cap phase) |
+| `internal/llm/agent/agent-tool.go` | Task agent created with `maxTurns=12` |
+| `internal/tui/tui.go` | Auto-compact uses `config.Get().CompactAt` (default 0.95) |
+| `internal/hardware/detect.go` | **New** — cross-platform GPU/CPU/RAM detection, 5 hardware profiles |
+| `internal/config/config.go` | **New** — hardware-aware defaults via `applyHardwareDefaults()` |
+| `internal/filetrack/tracker.go` | **New** — file staleness detection via `os.stat(mtime, size)` |
+| `internal/filetrack/global.go` | **New** — global tracker for file read recording |
+
+---
+
+## Enhanced: Smart Installer (new)
+
+`smart_installer/` — **Cross-platform interactive installer** that detects hardware and installs the optimal local LLM stack with LMCache.
+
+### Features
+- **Hardware detection** — GPU vendor/model/VRAM, CPU, RAM, OS
+- **Interactive stack selection** — vLLM+LMCache (NVIDIA/AMD GPU), Ollama (Apple Silicon/Windows), llama.cpp (CPU-only)
+- **User-controlled** — Every step asks for confirmation; nothing installs without explicit "yes"
+- **Auto-configures** — Context window, GPU memory, CPU offload, quantization based on hardware
+- **Generates client configs** — cortex-agent, opencode, Continue.dev, generic OpenAI-compatible
+- **Creates services** — systemd (Linux/WSL2), launchd (macOS), Task Scheduler (Windows)
+
+### Usage
+```bash
+# Linux/macOS
+./smart-install.sh
+
+# Windows PowerShell
+.\smart-install.ps1
+
+# Preview only
+python smart_installer/smart_install.py --dry-run --no-rich
+```
+
+### Output
+Installs to `~/.llm-stack/` with:
+- Python venv + PyTorch + vLLM/Ollama/llama.cpp + LMCache
+- Optimized configs (vLLM, LMCache, Ollama, llama.cpp)
+- Launch scripts (`start.sh` / `start.ps1`)
+- System service files (systemd / launchd)
+- Client configs for cortex-agent, opencode, Continue.dev
+
+---
+
+## WSL2 + vLLM + LMCache Setup (Windows)
+
+For Windows users wanting vLLM + LMCache (which requires Linux):
+
+See [`WSL2-LMCACHE-SETUP.md`](WSL2-LMCACHE-SETUP.md) for a one-command PowerShell script that:
+1. Installs WSL2 Ubuntu 24.04 with GPU passthrough
+2. Configures 24GB RAM / 8GB swap via `.wslconfig`
+3. Installs PyTorch CUDA 12.1, vLLM, LMCache in a venv
+4. Creates systemd service for auto-start
+5. Exposes API at `http://localhost:8000/v1`
+
+Run:
+```powershell
+.\setup-wsl2-lmcache.ps1          # First run: installs WSL2, prompts reboot
+.\setup-wsl2-lmcache.ps1 -SkipWSLInstall  # After reboot: completes inside WSL
+```
+
+---
+
+## Credits & Attribution
+
+This project builds on exceptional work from the open-source community. Full attribution in [README.md#credits--attribution](README.md#credits--attribution).
+
+**Key dependencies:**
+- **Base fork:** [avbiswas/neural-code](https://github.com/avbiswas/neural-code) by **AVB** — original agent harness + Neural Breakdown tutorial
+- **opencode** — Go agent architecture reference for efficiency pattern port
+- **vLLM** — PagedAttention inference engine
+- **LMCache** — KV cache offloading layer
+- **Ollama** — Native cross-platform LLM runner
+- **llama.cpp** — CPU/GPU GGUF inference engine
+- **PyTorch, Rich, Prompt Toolkit, uv** — Python ecosystem foundations
+- **MCP (Anthropic)** — Model Context Protocol for tool exposure
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.

@@ -188,6 +188,65 @@ def check_stale(files_read_this_turn):
 
 ---
 
+## Pattern 6: Hardware-Aware Automatic Configuration
+
+**What:** Detect system hardware (GPU vendor/model/VRAM, CPU, RAM, OS) at startup and automatically configure optimal defaults for context window, quantization, GPU memory utilization, CPU offload, and subagent limits.
+
+**Why:** Optimal settings vary dramatically by hardware. A 16GB GPU needs different context/quantization than a 48GB GPU or Apple Silicon unified memory.
+
+**Implementation:**
+```python
+def detect_hardware():
+    # Returns: GPU vendor/model/VRAM/unified, CPU cores/model, RAM bytes, OS
+    hw = HardwareInfo(
+        gpu=GPUInfo(vendor="nvidia", model="RTX 5060 Ti", vram_bytes=17_103_323_136, unified_memory=False),
+        cpu=CPUInfo(model="AMD Ryzen 9 7900X", cores=16, threads=16),
+        ram_bytes=34_359_738_368,
+        os="Windows", os_version="11", arch="AMD64"
+    )
+    return hw
+
+def get_profile(hw):
+    # Maps hardware to profile with optimal settings
+    if hw.gpu.vendor == "nvidia" and hw.gpu.vram_bytes >= 24 * GiB:
+        return Profile(context_window=128000, quantization="FP16", gpu_mem=0.9, cpu_offload_gb=64)
+    elif hw.gpu.vendor == "nvidia" and hw.gpu.vram_bytes >= 8 * GiB:
+        return Profile(context_window=65536, quantization="FP16", gpu_mem=0.85, cpu_offload_gb=32)
+    # ... more profiles
+```
+
+**Porting notes:**
+- Detect GPU via `nvidia-smi`, `rocm-smi`, `lspci`, `wmic`, `system_profiler`
+- Detect RAM via `/proc/meminfo`, `sysctl`, `wmic`
+- Map to 5 profiles: high_end, mid_range, low_end, apple_silicon, cpu_only
+- Apply defaults at config load; allow user override in config file
+
+---
+
+## Pattern 7: Interactive Smart Installation
+
+**What:** Cross-platform installer that detects hardware, presents options interactively, and installs the optimal local LLM stack (vLLM+LMCache, Ollama, or llama.cpp) with full user control.
+
+**Why:** Installing local LLM stacks is complex (CUDA, ROCm, WSL2, quantization choices). Users need guidance without being forced into decisions.
+
+**Features:**
+- Hardware detection → recommends optimal stack
+- Interactive prompts for every component (CUDA, ROCm, Python venv, models, services)
+- User confirms each step — nothing installs without explicit "yes"
+- Generates client configs for cortex-agent, opencode, Continue.dev
+- Creates system services (systemd, launchd, Task Scheduler)
+
+**Usage:**
+```bash
+# Auto-detect and install interactively
+python smart_installer/smart_install.py
+
+# Preview what would happen
+python smart_installer/smart_install.py --dry-run --no-rich
+```
+
+---
+
 ## Porting Checklist for Target Client
 
 | Pattern | Files to Modify | Difficulty |
@@ -197,19 +256,36 @@ def check_stale(files_read_this_turn):
 | Compaction | agent loop, summarization provider, session store | High |
 | Subagent isolation | agent factory, tool registry, task tool | Medium |
 | File staleness | file read tool, injection builder | Low |
+| Hardware-aware config | config loader, hardware detection, defaults | Medium |
+| Smart installer | separate project (reference only) | N/A |
 
 ---
 
 ## Reference Implementation: Opencode Patch
 
-The opencode patch at `../opencode-efficiency-patch/` (private) demonstrates all 5 patterns applied to a real client:
+The opencode patch at `../opencode-efficiency-patch/` (private) demonstrates all patterns applied to a real client:
 
 - `internal/message/message.go`: StripToolResults, locked prefix finder
-- `internal/llm/agent/agent.go`: late injection, turn loop integration, maxTurns
+- `internal/llm/agent/agent.go`: late injection, turn-loop compaction trigger, maxTurns
 - `internal/llm/prompt/coder.go`: removed env info from system prompt
-- `internal/llm/prompt/task.go`: rewritten for isolation
+- `internal/llm/prompt/task.go`: rewritten for strict isolation
 - `internal/llm/tools/bash.go`: MaxOutputLength 30K→10K
 - `internal/llm/tools/view.go`: MaxReadSize 250KB→100KB, DefaultReadLimit 2000→500
+- `internal/hardware/detect.go`: **New** — cross-platform GPU/CPU/RAM detection, 5 hardware profiles
+- `internal/config/config.go`: **New** — hardware-aware defaults via `applyHardwareDefaults()`
+- `internal/filetrack/tracker.go`: **New** — file staleness detection via `os.stat(mtime, size)`
+- `internal/filetrack/global.go`: **New** — global tracker for file read recording
+
+---
+
+## Additional: Smart Installer (Reference Implementation)
+
+`smart_installer/` — Cross-platform interactive installer:
+
+- `hardware_detect.py` — Cross-platform GPU/CPU/RAM/OS detection
+- `interactive.py` — Rich/text UI with prompts, tables, confirmations
+- `smart_install.py` — Main orchestrator with step-by-step flow
+- Wrappers: `smart-install.sh` (Linux/macOS), `smart-install.ps1` (Windows)
 
 ---
 
