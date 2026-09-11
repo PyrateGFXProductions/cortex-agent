@@ -1,0 +1,121 @@
+# Smart LLM Inference Stack Installer
+
+Cross-platform installer that detects hardware and installs the optimal local LLM stack with LMCache.
+
+## Supported Platforms
+
+| Platform | GPU Support | Recommended Stack |
+|----------|-------------|-------------------|
+| **Windows** | NVIDIA (WSL2) | vLLM + LMCache in WSL2 Ubuntu |
+| **Linux** | NVIDIA/AMD/Intel | vLLM + LMCache (native) |
+| **macOS** | Apple Silicon | Ollama + LMCache (experimental) / llama.cpp |
+| **Windows** | AMD/Intel | Ollama native / llama.cpp |
+| **Windows** | No GPU | Ollama CPU / llama.cpp |
+
+## Quick Start
+
+```bash
+# Windows (PowerShell Admin)
+.\smart-install.ps1
+
+# Linux/macOS
+./smart-install.sh
+
+# Or universal Python
+python smart-install.py
+```
+
+## What It Does
+
+1. **Detects hardware**: GPU (vendor, model, VRAM), CPU, RAM, OS
+2. **Recommends stack**: Based on hardware profile
+3. **Installs dependencies**: CUDA, Python, vLLM/Ollama/llama.cpp, LMCache
+4. **Configures optimally**: Context window, GPU memory, CPU offload, quantization
+5. **Creates service**: systemd (Linux/WSL2), launchd (macOS), or manual scripts
+6. **Outputs client configs**: For cortex-agent, opencode, etc.
+
+## Hardware Profiles & Recommendations
+
+| Profile | GPU VRAM | System RAM | Stack | Quantization | Context |
+|---------|----------|------------|-------|--------------|---------|
+| **High-End** | ≥24GB | ≥64GB | vLLM + LMCache | FP16/BF16 | 128K+ |
+| **Mid-Range** | 8-24GB | 32-64GB | vLLM + LMCache | FP16/8-bit | 32-64K |
+| **Entry** | 4-8GB | 16-32GB | vLLM + LMCache | 4-bit/8-bit | 16-32K |
+| **Apple Silicon** | Unified | ≥32GB | Ollama/llama.cpp | 4-bit | 32K |
+| **Apple Silicon** | Unified | 16-32GB | Ollama/llama.cpp | 4-bit | 16K |
+| **CPU Only** | None | ≥16GB | llama.cpp | 4-bit | 8-16K |
+
+## Configuration Files Generated
+
+```
+~/.llm-stack/
+├── config.yaml           # Main configuration
+├── hardware.json         # Detected hardware
+├── model-config.yaml     # Model-specific settings
+├── service/              # Systemd/launchd service files
+├── start.sh / start.ps1  # Manual launch scripts
+└── client-configs/       # cortex-agent, opencode, etc.
+```
+
+## Client Integration
+
+After install, you get ready-to-use configs:
+
+**cortex-agent** (`~/.agents/env`):
+```bash
+BASE_URL=http://localhost:8000/v1
+API_KEY=dummy
+MODEL=local-model
+CONTEXT_WINDOW=32768
+```
+
+**opencode** (`~/.opencode.json`):
+```json
+{
+  "providers": {"local": {"apiKey": "dummy", "baseURL": "http://localhost:8000/v1"}},
+  "agents": {"coder": {"model": "local/local-model"}}
+}
+```
+
+**Any OpenAI-compatible client**: Point to `http://localhost:8000/v1`
+
+## Customization
+
+```bash
+# Override model
+./smart-install.py --model "Qwen/Qwen2.5-14B-Instruct"
+
+# Override quantization
+./smart-install.py --quantization 4bit
+
+# Force CPU-only
+./smart-install.py --cpu-only
+
+# Dry run (show what would be done)
+./smart-install.py --dry-run
+```
+
+## Requirements
+
+- **Windows**: Admin PowerShell, NVIDIA drivers (for GPU)
+- **Linux**: sudo, NVIDIA/AMD drivers
+- **macOS**: Homebrew, Apple Silicon (Intel Macs: CPU only)
+
+## Architecture
+
+```
+smart-install.py
+├── hardware_detect.py     # Cross-platform hardware detection
+├── stack_selector.py      # Chooses optimal stack for hardware
+├── installers/
+│   ├── vllm_lmcache.py   # vLLM + LMCache (Linux/WSL2)
+│   ├── ollama.py         # Ollama (macOS/Windows native)
+│   └── llama_cpp.py      # llama.cpp (fallback/CPU)
+├── config_generator.py   # Generates optimal configs
+├── service_manager.py    # systemd/launchd/manual
+└── client_config.py      # Outputs agent configs
+```
+
+## License
+
+MIT - Part of cortex-agent efficiency patterns

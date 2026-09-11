@@ -1,7 +1,10 @@
 # cortex-agent
 
-A minimal, self-contained coding agent harness.
-Fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB, extended with performance fixes, MCP support, and proper distribution.
+A **reference implementation of context-window efficiency patterns** for AI coding agents.
+
+Originally a minimal, self-contained coding agent harness (fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB). Now primarily serves as **documented, portable patterns** that can be applied to any client: opencode, hermes, claude-code, aider, etc.
+
+The standalone agent (`uv run cortex-agent`) still works and demonstrates all patterns in action.
 
 ## Working in this repo
 
@@ -9,6 +12,18 @@ Fork of [neuralcode](https://github.com/avbiswas/neural-code) by AVB, extended w
 - Config: `~/.agents/env` — set `BASE_URL`, `API_KEY`, optionally `MODEL` and `CONTEXT_WINDOW`
 - Skills: `~/.agents/skills/<name>/SKILL.md` or `.agents/skills/<name>/SKILL.md`
 - Run: `cortex-agent` (after install) or `uv run cortex-agent`
+
+## Efficiency Patterns (Portable to Any Client)
+
+See [`EFFICIENCY_PATTERNS.md`](EFFICIENCY_PATTERNS.md) for the five core patterns:
+
+1. **Locked Prefix + Late Injection** — preserve prompt cache by never mutating cached messages; inject env context ephemerally at send time
+2. **Three-Tier Tool Output Degradation** — cap (10K) → strip (300 chars) → drop (emergency)
+3. **Compaction with Prefix Rebuild** — summarize at 85% full, rebuild to 35%, new prefix cached
+4. **Isolated Subagents** — fresh context window, read-only tools, 12-turn cap, only final answer returns
+5. **File Staleness Detection** — `os.stat(mtime, size)` diff per turn, warn on stale reads
+
+These patterns are language-agnostic. The reference implementation is in `cortex_agent/`; the opencode port is in `../opencode-efficiency-patch/` (private).
 
 ## Architecture
 
