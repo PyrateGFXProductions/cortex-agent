@@ -20,11 +20,19 @@ def find_skills():
     return skills
 
 
-SKILLS = find_skills()
+_SKILLS_CACHE = None
+
+
+def _get_skills():
+    """Lazy-load skills to avoid import-time filesystem access."""
+    global _SKILLS_CACHE
+    if _SKILLS_CACHE is None:
+        _SKILLS_CACHE = find_skills()
+    return _SKILLS_CACHE
 
 
 def skills_prompt():
-    return "\n".join(f"- {name}: {s['description']}" for name, s in SKILLS.items())
+    return "\n".join(f"- {name}: {s['description']}" for name, s in _get_skills().items())
 
 
 def read_skill(name: str) -> str:

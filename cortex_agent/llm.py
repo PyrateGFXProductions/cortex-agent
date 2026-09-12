@@ -25,7 +25,14 @@ def _get_client():
         _client = OpenAI(base_url=_cfg.BASE_URL, api_key=_cfg.API_KEY)
     return _client
 
-SYSTEM_PROMPT = f"""
+
+def get_client():
+    """Get the OpenAI client (lazy initialization)."""
+    return _get_client()
+
+def _build_system_prompt() -> str:
+    """Build system prompt lazily to avoid import-time filesystem access."""
+    return f"""
 You are a coding agent. Your job is to code. Always code.
 Use the bash tool to inspect files.
 Use write_file to create files and str_replace to edit them.
@@ -61,6 +68,17 @@ If a skill matches what the user wants, call read_skill first and follow it.
 """
 
 
+_SYSTEM_PROMPT_CACHE = None
+
+
+def get_system_prompt() -> str:
+    """Get system prompt, building it lazily on first access."""
+    global _SYSTEM_PROMPT_CACHE
+    if _SYSTEM_PROMPT_CACHE is None:
+        _SYSTEM_PROMPT_CACHE = _build_system_prompt()
+    return _SYSTEM_PROMPT_CACHE
+
+
 def call_llm(messages, tools=None):
     response = _get_client().chat.completions.create(
         model=config.MODEL,
@@ -87,7 +105,7 @@ if __name__ == "__main__":
     user_input = input("Enter your prompt> ")
 
     message, usage = call_llm([
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_system_prompt()},
         {"role": "user", "content": user_input},
     ])
 

@@ -11,7 +11,7 @@ and every trim costs the whole prompt cache.
 
 from . import config
 from .history import estimate, strip
-from .llm import client
+from .llm import get_client
 
 SYSTEM_PROMPT = """
 You are compacting the transcript of a coding session. The session is out of
@@ -78,7 +78,7 @@ def render(messages):
 
 def summarize(messages):
     """One LLM call, no tools. Returns the handoff note."""
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=config.MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},

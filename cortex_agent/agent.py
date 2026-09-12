@@ -5,7 +5,7 @@ from . import compact
 from . import history
 from . import session
 from .context import reminder
-from .llm import SYSTEM_PROMPT, call_llm
+from .llm import call_llm, get_system_prompt
 from . import sandbox
 from .todos import active_form
 from .tools import execute
@@ -24,7 +24,7 @@ def main():
     ui.banner(sandbox.name())
 
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": get_system_prompt()}]
     if cli.resume:
         saved = session.all_sessions()
         if saved:
