@@ -9,7 +9,7 @@ The standalone agent (`uv run cortex-agent`) still works and demonstrates all pa
 ## Working in this repo
 
 - All agent logic lives in `cortex_agent/`
-- Config: `~/.agents/env` — set `BASE_URL`, `API_KEY`, optionally `MODEL` and `CONTEXT_WINDOW`
+- Config: `~/.agents/env` — set `BASE_URL`, `API_KEY`, `MODEL`, optionally `CONTEXT_WINDOW`. No model is hardcoded; the setup wizard discovers models already on the machine (Ollama's `ollama list`) and asks which to use.
 - Skills: `~/.agents/skills/<name>/SKILL.md` or `.agents/skills/<name>/SKILL.md`
 - Run: `cortex-agent` (after install) or `uv run cortex-agent`
 
@@ -161,8 +161,18 @@ install LLM stacks.
 
 ### What it does
 
-- **Probe** — `python -m smart_installer <client-tree>` assesses which
-  patterns already exist (`applied / partial / absent`) with hook points.
+The installer has **two options**, and neither ever touches an LLM model — a
+client already has its endpoint and model; this project only changes how it
+handles information.
+
+1. **`demo`** — set up the standalone demo client (`cortex-agent`). Its setup
+   discovers models already on the machine and suggests them rather than
+   hardcoding one.
+2. **`patch`** — apply the six efficiency patterns to an existing client's
+   source tree.
+
+- **Probe** — `patch <client-tree>` assesses which patterns already exist
+  (`applied / partial / absent`) with hook points.
 - **Guide** — `--guide` prints per-pattern porting instructions tuned to the
   detected language.
 - **Recipe apply** — `--apply` applies a verified idempotent edit-plan for a
@@ -174,10 +184,12 @@ install LLM stacks.
 ### Usage
 
 ```bash
-python -m smart_installer ../opencode                 # probe
-python -m smart_installer ../opencode --guide         # porting instructions
-python -m smart_installer ../opencode --apply --dry-run  # preview diffs
-python -m smart_installer ../opencode --apply         # apply for real
+python -m smart_installer                              # interactive menu
+python -m smart_installer demo                         # option 1: set up the demo client
+python -m smart_installer patch ../opencode            # option 2: probe
+python -m smart_installer patch ../opencode --guide
+python -m smart_installer patch ../opencode --apply --dry-run
+python -m smart_installer patch ../opencode --apply
 ```
 
 See `smart_installer/README.md` for the plugin API and safety semantics.

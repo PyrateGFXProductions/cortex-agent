@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
-"""smart-installer — apply cortex-agent efficiency patterns to any AI client.
+"""smart-installer — two things, no model hardcoding.
+
+This tool configures the cortex-agent *efficiency patterns*. It never installs
+or chooses an LLM model — a client already has its own endpoint and model, and
+cortex-agent only changes how that client handles information.
+
+  1. demo  — set up the standalone demo client (cortex-agent). This is a fully
+     functional reference client that demonstrates the patterns. Its setup
+     *discovers* models already on the machine (e.g. Ollama) and suggests them
+     rather than hardcoding one.
+  2. patch — apply the six efficiency patterns to an existing client's source
+     tree (opencode, aider, hermes, …). The client's model and settings are
+     left untouched; only the pattern wiring is edited.
 
 Usage (from repo root):
 
-    # inspect a client source tree (no changes)
-    python -m smart_installer path/to/opencode
-
-    # dry-run: show the exact edits for every pattern a recipe covers
-    python -m smart_installer path/to/opencode --apply --dry-run
-
-    # actually apply the recipe (creates a timestamped backup dir)
-    python -m smart_installer path/to/opencode --apply
-
-    # probe only one pattern / show guidance for all
-    python -m smart_installer path/to/aider --probe-only
-    python -m smart_installer path/to/client --guide
+    python -m smart_installer                            # interactive menu
+    python -m smart_installer demo                       # option 1
+    python -m smart_installer patch path/to/opencode     # option 2, probe
+    python -m smart_installer patch path/to/opencode --apply --dry-run
+    python -m smart_installer patch path/to/opencode --apply
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
 from .core.target import Target
 from .engine import Engine
@@ -29,13 +33,35 @@ from .patterns.library import REGISTRY, BY_ID
 from .recipes import RECIPES
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="smart-installer",
-        description="Apply cortex-agent efficiency patterns to any AI coding client source tree.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-    )
+# ----------------------------------------------------------------- option 1
+
+def run_demo() -> int:
+    """Set up the standalone demo client. Discovers models, never hardcodes."""
+    try:
+        from cortex_agent.setup_wizard import ensure_configured
+    except ImportError:
+        print(
+            "error: cannot find the demo client (cortex_agent) in this tree. "
+            "Run from the repo root.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print("==> cortex-agent demo client setup")
+    ensure_configured()
+
+    print()
+    print("Demo client configured. Run it from inside any project directory:")
+    print("    uv run cortex-agent        # or:  python -m cortex_agent")
+    print()
+    print("Install it system-wide with:")
+    print("    uv tool install .[mcp]     # or:  pip install .")
+    return 0
+
+
+# ----------------------------------------------------------------- option 2
+
+def add_patch_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("target", help="path to the client source tree to inspect/patch")
     p.add_argument("--apply", action="store_true", help="apply a known client recipe (default: probe only)")
     p.add_argument("--dry-run", action="store_true", help="with --apply: show edits without writing (off by default — a bare --apply writes)")
@@ -43,12 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--probe-only", action="store_true", help="only assess pattern status, no edits/recipe")
     p.add_argument("--guide", action="store_true", help="print porting instructions per pattern")
     p.add_argument("--force", action="store_true", help="allow editing a tree that is not a git checkout")
-    return p
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-
+def run_patch(args: argparse.Namespace) -> int:
     try:
         target = Target(args.target)
     except NotADirectoryError as exc:
@@ -91,7 +114,6 @@ def main(argv: list[str] | None = None) -> int:
             print("Run without --apply to get porting guidance you can apply by hand.", file=sys.stderr)
             return 1
 
-        # Safety: --apply without --dry-run writes. Pass --dry-run to preview.
         engine = Engine(target, dry_run=True, force=args.force)
         reason = engine.ensure_safe()
         if reason and not args.force:
@@ -122,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"applied={applied} already-present={skipped} needs-manual={problem}")
         if engine.backup_dir:
             print(f"backup: {engine.backup_dir}")
-        print("Review the edits, then build/test the client. Re-reun this tool to confirm 'applied' status.")
+        print("Review the edits, then build/test the client. Re-run this tool to confirm 'applied' status.")
         return 0
 
     # ---- no recipe, no --apply: give next-step hints ---------------------
@@ -135,6 +157,61 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"  (no recipe yet for {target.client!r}; add one in smart_installer/recipes/__init__.py)")
     return 0
+
+
+# ------------------------------------------------------------ dispatch
+
+def interactive_menu() -> int:
+    print("cortex-agent smart installer")
+    print()
+    print("What would you like to do?")
+    print("  1. Set up the standalone demo client (cortex-agent)")
+    print("  2. Apply efficiency patterns to an existing client")
+    print()
+    try:
+        choice = input("Choose [1/2] > ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return 0
+
+    if choice == "1":
+        return run_demo()
+
+    if choice == "2":
+        try:
+            path = input("Path to the client source tree > ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+        if not path:
+            print("No path given.", file=sys.stderr)
+            return 1
+        return run_patch(argparse.Namespace(target=path, apply=False, dry_run=False, pattern=None, probe_only=False, guide=False, force=False))
+
+    print("Nothing selected.")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="smart-installer",
+        description="Apply cortex-agent efficiency patterns, or set up the demo client. Never hardcodes a model.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    sub = p.add_subparsers(dest="command")
+    sub.add_parser("demo", help="set up the standalone demo client (discovers local models)")
+    add_patch_args(sub.add_parser("patch", help="apply efficiency patterns to an existing client"))
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.command == "demo":
+        return run_demo()
+    if args.command == "patch":
+        return run_patch(args)
+    return interactive_menu()
 
 
 if __name__ == "__main__":

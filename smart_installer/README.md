@@ -5,22 +5,37 @@ them into any AI coding client** (opencode, hermes, aider, claude-code, custom
 clients). Point it at a client source tree; it probes what's already there, then
 either applies a verified recipe or gives you the exact porting instructions.
 
-This is **not** an installer for LLM inference stacks. It patches *source code*.
+This is **not** an installer for LLM inference stacks — and it never chooses or
+installs a model. A client already has its endpoint and model; this project only
+changes how the client handles information.
+
+## Two options
+
+| Option | Command | What it does |
+|--------|---------|--------------|
+| **demo**  | `python -m smart_installer demo` | Set up the standalone demo client (`cortex-agent`). Discovers models already on the machine (Ollama's `ollama list`) and suggests them — never hardcodes one. |
+| **patch** | `python -m smart_installer patch <client-tree>` | Apply the six efficiency patterns to an existing client's source code. |
 
 ## Quick Start
 
 ```bash
-# Probe a client source tree (no changes): what's already applied? where are the hook points?
-python -m smart_installer ../opencode
+# Interactive menu (picks option 1 or 2)
+python -m smart_installer
+
+# Option 1: set up the demo client (discovers local models)
+python -m smart_installer demo
+
+# Option 2: probe a client source tree (no changes)
+python -m smart_installer patch ../opencode
 
 # Porting guidance for every pattern, hand-tuned to the detected language
-python -m smart_installer ../opencode --guide
+python -m smart_installer patch ../opencode --guide
 
 # Apply a verified recipe (dry-run first — shows every diff, writes nothing)
-python -m smart_installer ../opencode --apply --dry-run
+python -m smart_installer patch ../opencode --apply --dry-run
 
 # Apply for real (git-checkout safety + timestamped backup + idempotent)
-python -m smart_installer ../opencode --apply
+python -m smart_installer patch ../opencode --apply
 ```
 
 ## The Six Patterns
@@ -49,15 +64,18 @@ smart_installer/
 
 ### Two modes
 
-1. **Probe + guide** (default, always available): assesses each pattern against
-   any client tree regardless of language, reports `applied / partial / absent`,
-   and prints concrete porting instructions quoting the reference implementation.
+1. **`demo`** — configures the standalone demo client. Never hardcodes a model:
+   it discovers models already on the machine (Ollama) and suggests them.
 
-2. **Recipe apply** (for known clients): a recipe is an order-independent set of
-   find/replace edits plus new-file creation. Every edit is checked for its
-   marker before applying (idempotent), every touched file is backed up to
-   `.cortex-smart-installer-backup-<timestamp>/`, and a git-checkout check runs
-   first. Dry-run shows unified diffs without touching disk.
+2. **`patch`** — against any client tree:
+   - **Probe + guide** (default, always available): assesses each pattern against
+     any client tree regardless of language, reports `applied / partial / absent`,
+     and prints concrete porting instructions quoting the reference implementation.
+   - **Recipe apply** (for known clients): a recipe is an order-independent set of
+     find/replace edits plus new-file creation. Every edit is checked for its
+     marker before applying (idempotent), every touched file is backed up to
+     `.cortex-smart-installer-backup-<timestamp>/`, and a git-checkout check runs
+     first. Dry-run shows unified diffs without touching disk.
 
 ## Adding a New Client Recipe
 
@@ -83,7 +101,7 @@ def hermes_recipe(target: Target) -> EditPlan:
 RECIPES["hermes"] = hermes_recipe
 ```
 
-Then `python -m smart_installer path/to/hermes --apply --dry-run` previews it.
+Then `python -m smart_installer patch path/to/hermes --apply --dry-run` previews it.
 Workflow: probe → guide → write edits into a recipe → dry-run → apply → verify
 against a long session (`cache_read_tokens > 0`).
 

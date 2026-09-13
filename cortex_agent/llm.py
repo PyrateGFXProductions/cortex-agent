@@ -80,6 +80,12 @@ def get_system_prompt() -> str:
 
 
 def call_llm(messages, tools=None):
+    if not config.MODEL:
+        raise RuntimeError(
+            "No model configured. Set MODEL in ~/.agents/env, or run the "
+            "setup wizard (`cortex-agent` / `python -m smart_installer demo`) "
+            "to pick one — the installer discovers models already on the machine."
+        )
     response = _get_client().chat.completions.create(
         model=config.MODEL,
         messages=messages,

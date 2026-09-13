@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `subagent.py`: `write_file` is now withheld from subagents, making them structurally read-only as documented
 - `install.sh` / `install.ps1`: write a commented-out `API_KEY` instead of a placeholder key, so the first-run setup wizard runs as intended
 - `setup_wizard.py`: treat the installer's placeholder key (`sk-or-your-key-here`) as "not configured"
+- Removed all hardcoded model names — `config.py` no longer defaults `MODEL`, and the setup wizard discovers models already on the machine (Ollama's `ollama list`) rather than guessing one on any provider
+- `smart_installer` now exposes **two options** — `demo` (set up the standalone demo client, with model discovery) and `patch` (apply efficiency patterns to an existing client) — replacing the single positional `target` argument
 
 ### Security
 - `permissions.py`: a command using command substitution (`$(...)`, backticks) or file redirection (`>`, `<`) is no longer silently allowed — it prompts the user

@@ -13,7 +13,11 @@ if ENV_FILE.exists():
 
 BASE_URL = os.environ.get("BASE_URL", "")
 API_KEY = os.environ.get("API_KEY", "")
-MODEL = os.environ.get("MODEL", "deepseek/deepseek-v4-flash")
+# No model is hardcoded: the demo client talks to whatever OpenAI-compatible
+# endpoint the user points at, and the model must be set by the user (via
+# ~/.agents/env or the setup wizard, which discovers models already on the
+# machine). An empty value means "not configured yet".
+MODEL = os.environ.get("MODEL", "")
 
 # How much room the model has, and how we spend it.
 CONTEXT_WINDOW = int(os.environ.get("CONTEXT_WINDOW", 128_000))

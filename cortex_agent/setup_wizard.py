@@ -2,13 +2,17 @@
 
 Called from agent.main() before anything that needs BASE_URL or API_KEY.
 If the credentials are already present (env file or environment), this is a
-no-op. Otherwise it walks the user through picking a provider, entering an
-API key, and optionally choosing a model, then writes ~/.agents/env so
-subsequent runs skip the wizard entirely.
+no-op. Otherwise it walks the user through picking a provider and entering an
+API key, then figures out which model to use — never by hardcoding one: for a
+local backend it discovers the models already on the machine (e.g. Ollama) and
+suggests them, and for a remote provider it asks. It then writes ~/.agents/env
+so subsequent runs skip the wizard entirely.
 """
 
 import getpass
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 ENV_FILE = Path.home() / ".agents" / "env"
@@ -18,25 +22,21 @@ PROVIDERS = {
         "OpenRouter  (recommended — one key, access to every model)",
         "https://openrouter.ai/api/v1",
         "https://openrouter.ai/keys",
-        "deepseek/deepseek-v4-flash",
     ),
     "2": (
         "OpenAI  (GPT-4o, o3, etc.)",
         "https://api.openai.com/v1",
         "https://platform.openai.com/api-keys",
-        "gpt-4o-mini",
     ),
     "3": (
         "Local  (Ollama / LM Studio — no API key needed)",
         "http://localhost:11434/v1",
         None,
-        "llama3",
     ),
     "4": (
         "Other  (enter your own base URL)",
         None,
         None,
-        "",
     ),
 }
 
@@ -103,17 +103,62 @@ def _secret(label: str) -> str:
         print("  API key cannot be empty. Try again.")
 
 
+def discover_local_models() -> list[str]:
+    """Return the model names a local backend already has, or [] if unknown.
+
+    The demo client talks to any OpenAI-compatible endpoint. We never hardcode
+    which model to use — for a local backend we list what is actually present
+    on the machine (Ollama) and let the user pick, rather than guessing a name
+    that may not be pulled yet.
+    """
+    if not shutil.which("ollama"):
+        return []
+    try:
+        out = subprocess.run(
+            ["ollama", "list"], capture_output=True, text=True, timeout=5
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    names = []
+    for line in out.splitlines()[1:]:  # skip the header row
+        fields = line.split()
+        if fields and ":" in fields[0]:
+            names.append(fields[0])
+    return names
+
+
+def _choose_model(provider: str) -> str:
+    """Pick a model without ever assuming one. Local backends get their own
+    discovered models suggested; remote backends are asked directly."""
+    local = discover_local_models() if provider == "3" else []
+    if local:
+        _ok(f"Found {len(local)} model(s) already on this machine")
+        for i, name in enumerate(local, 1):
+            print(f"  {i}  {name}")
+        print(f"  m  enter a different model name")
+        raw = _prompt("Choose a model", default=local[0])
+        if raw.strip().lower() != "m":
+            if raw.isdigit() and 1 <= int(raw) <= len(local):
+                return local[int(raw) - 1]
+            for name in local:
+                if name == raw.strip():
+                    return name
+
+    while True:
+        model = _prompt("Model name").strip()
+        if model:
+            return model
+        print("  A model name is required — it must match an endpoint.")
+
+
 def _write_env(base_url: str, api_key: str, model: str):
-    """Write (or append to) ~/.agents/env."""
+    """Write (or overwrite) ~/.agents/env."""
     ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
     content = (
         "# cortex-agent configuration\n"
         f"BASE_URL={base_url}\n"
         f"API_KEY={api_key}\n"
-    )
-    if model:
-        content += f"MODEL={model}\n"
-    content += (
+        f"MODEL={model}\n"
         "\n"
         "# Optional\n"
         "# CONTEXT_WINDOW=128000\n"
@@ -123,8 +168,7 @@ def _write_env(base_url: str, api_key: str, model: str):
     # Inject into the current process so the agent starts without a restart.
     os.environ["BASE_URL"] = base_url
     os.environ["API_KEY"] = api_key
-    if model:
-        os.environ.setdefault("MODEL", model)
+    os.environ["MODEL"] = model
 
 
 def ensure_configured():
@@ -143,7 +187,7 @@ def ensure_configured():
     if choice not in PROVIDERS:
         choice = "1"
 
-    label, base_url, key_url, default_model = PROVIDERS[choice]
+    label, base_url, key_url = PROVIDERS[choice]
 
     # --- Base URL (custom provider) ---
     if base_url is None:
@@ -162,8 +206,8 @@ def ensure_configured():
             print(f"\n  Get your API key at: {key_url}\n")
         api_key = _secret("API key (hidden)")
 
-    # --- Model ---
-    model = _prompt("Model", default=default_model)
+    # --- Model (discovered for local backends, never hardcoded) ---
+    model = _choose_model(choice)
 
     # --- Write and confirm ---
     _write_env(base_url, api_key, model)

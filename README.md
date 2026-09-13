@@ -50,28 +50,40 @@ uv sync
 cat > ~/.agents/env << 'EOF'
 BASE_URL=https://openrouter.ai/api/v1
 API_KEY=sk-or-...
-MODEL=deepseek/deepseek-v4-flash   # optional, this is the default
+# MODEL=<your-model-id>   # required; no model is hardcoded
 EOF
 
 uv run cortex-agent
 ```
+
+> No model name is hardcoded anywhere. On first run `cortex-agent` launches a
+> setup wizard that **discovered models already on the machine** (it reads Ollama's
+> `ollama list`) and asks you to pick the endpoint and model.
 
 ### Apply Patterns to Another Client (Smart Installer)
 
 Cortex-agent is a reference implementation; adopt its patterns in opencode, hermes, aider, or your own client:
 
 ```bash
-python -m smart_installer path/to/opencode              # probe: what's applied / partial / absent
-python -m smart_installer path/to/opencode --guide      # per-pattern porting instructions
-python -m smart_installer path/to/opencode --apply --dry-run  # preview exact diffs
-python -m smart_installer path/to/opencode --apply      # apply for real (idempotent)
+python -m smart_installer                             # interactive menu (two options)
+python -m smart_installer demo                        # option 1: set up the demo client
+python -m smart_installer patch path/to/opencode       # option 2: probe a client
+python -m smart_installer patch path/to/opencode --apply --dry-run  # preview diffs
+python -m smart_installer patch path/to/opencode --apply           # apply (idempotent)
 ```
 
-This probes the client source tree, reports which of the six patterns already
-exist, and can apply a verified recipe (opencode ships as the reference; new
-clients are one function in `smart_installer/recipes/`). Preview with
-`--apply --dry-run` (writes nothing); a real `--apply` is guarded by a
-git-checkout requirement, writes timestamped backups, and re-runs are no-ops.
+The smart installer does **two** things, and neither ever touches an LLM model —
+a client already has its endpoint and model; cortex-agent only changes how it
+handles information:
+
+1. **`demo`** — installs/configures the standalone demo client. Its setup
+   discovers models already on the machine (Ollama) and suggests them.
+2. **`patch`** — probes a client source tree, reports which of the six patterns
+   already exist, and applies a verified recipe (opencode ships as the
+   reference; new clients are one function in `smart_installer/recipes/`).
+   Preview with `--apply --dry-run` (writes nothing); a real `--apply` is
+   guarded by a git-checkout requirement, writes timestamped backups, and
+   re-runs are no-ops.
 
 ---
 
@@ -158,21 +170,27 @@ the directory the server was launched from. Use the interactive CLI for full con
 
 `smart_installer/` implements the six efficiency patterns into any AI coding
 client by patching its **source code** (Go, Python, TypeScript, Rust — wherever
-the agent loop lives). It is not an LLM-stack installer.
+the agent loop lives). It is not an LLM-stack installer, and it never touches a
+model — it only changes how a client handles information.
 
 ```bash
 # Linux/macOS / Windows PowerShell — from the repo root:
-python -m smart_installer path/to/opencode                # probe
-python -m smart_installer path/to/opencode --guide        # porting instructions
-python -m smart_installer path/to/opencode --apply --dry-run  # preview diffs
-python -m smart_installer path/to/opencode --apply        # apply for real
+python -m smart_installer                              # interactive menu (two options)
+python -m smart_installer demo                         # option 1: set up the demo client
+python -m smart_installer patch path/to/opencode        # option 2: probe a client
+python -m smart_installer patch path/to/opencode --guide
+python -m smart_installer patch path/to/opencode --apply --dry-run
+python -m smart_installer patch path/to/opencode --apply
 ```
 
-**What it does:**
-1. **Probes** the target tree — reports each pattern as `applied / partial / absent` with hook points
-2. **Guides** — per-pattern porting instructions tuned to the detected language
-3. **Applies** — a verified, idempotent edit-plan for a known client (opencode ships as the reference recipe)
-4. **Safeguards** — dry-run preview, git-checkout requirement (unless `--force`), timestamped backups, re-runs are no-ops
+**Two options:**
+
+| Option | Command | What it does |
+|--------|---------|--------------|
+| **demo** | `python -m smart_installer demo` | Installs/configures the standalone demo client. Discovers models already on the machine (Ollama's `ollama list`) and suggests them — never hardcodes one. |
+| **patch** | `python -m smart_installer patch <client>` | Probes a client tree, reports each pattern `applied / partial / absent`, and applies a verified idempotent recipe. The client's model and settings are left untouched. |
+
+**Safeguards:** dry-run preview, git-checkout requirement (unless `--force`), timestamped backups, re-runs are no-ops.
 
 Adding a new client is one recipe function in `smart_installer/recipes/__init__.py`. See [`smart_installer/README.md`](smart_installer/README.md).
 
