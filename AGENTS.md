@@ -214,4 +214,8 @@ If cortex-agent has been useful to your workflow, consider supporting continued 
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details. This fork is derived from
+[neural-code](https://github.com/avbiswas/neural-code) by AVB; the original
+work remains copyright of its author, and this fork's enhancements (MCP
+server, smart installer, efficiency-pattern fixes, distribution files) are
+contributed under the same MIT terms.

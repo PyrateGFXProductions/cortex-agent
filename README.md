@@ -231,6 +231,8 @@ Your support helps fund new features, pattern research, and keeping the project 
 
 MIT License — see [LICENSE](LICENSE) for details.
 
+This project is a fork of [neural-code](https://github.com/avbiswas/neural-code) by AVB, with enhancements (MCP server, smart installer, efficiency-pattern performance fixes, distribution files). The original work remains copyright of its author; the fork's enhancements are contributed under the same MIT terms.
+
 ---
 
 ## Disclaimer
