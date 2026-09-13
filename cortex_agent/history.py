@@ -30,9 +30,15 @@ TRIMMED = "[output trimmed:"  # marker, so stripping twice is a no-op
 SUMMARY = "<summary>"  # marks the handoff note compaction leaves behind
 SPILLS = []  # temp files belonging to the current turn
 
-# Cache for locked(): keyed on len(messages) so it auto-invalidates when the
-# list grows (new message appended) or shrinks (/rewind, compaction).
-_LOCKED_CACHE: dict[int, int] = {}
+# Cache for locked(). Keyed on the list object's identity, not its length.
+# The Summary marker's position is fixed once a list has one: appending new
+# messages never moves it, and /rewind, compaction and switching sessions all
+# hand back a *new* list object (so a stale id cannot be served to them).
+# Keying on length was wrong - after a /rewind or compaction shrank the list
+# past a length seen earlier in the session, the old entry was returned as
+# though the prefix were still that long, so the tail was under-stripped.
+_LOCKED_ID: int | None = None
+_LOCKED_RESULT: int = 0
 
 
 # ------------------------------------------------------------------- 1. cap
@@ -86,21 +92,23 @@ def locked(messages):
     summary. Derived rather than remembered, so it stays correct across
     /compact, /rewind and switching sessions.
 
-    Result is cached by list length. The summary marker never moves once
-    compaction has run, and appending new messages only grows the list, so
-    a cached value for length N is still valid for length N+k - unless a
-    rewind or compaction shrinks the list, at which point the key misses and
-    we re-scan. This keeps the common case (append-only) at O(1).
+    Cached by list identity: the summary marker never moves once a list has
+    one, so the result is constant for a given list object. Appending only
+    grows that object, so the common (append-only) case stays O(1). A rewind,
+    compaction or session switch hands back a fresh list, whose new identity
+    misses the cache and triggers a recompute.
     """
-    key = len(messages)
-    if key in _LOCKED_CACHE:
-        return _LOCKED_CACHE[key]
+    global _LOCKED_ID, _LOCKED_RESULT
+    mid = id(messages)
+    if mid == _LOCKED_ID:
+        return _LOCKED_RESULT
     result = 0
-    for index in range(key - 1, -1, -1):
+    for index in range(len(messages) - 1, -1, -1):
         if SUMMARY in (messages[index].get("content") or ""):
             result = index + 1
             break
-    _LOCKED_CACHE[key] = result
+    _LOCKED_ID = mid
+    _LOCKED_RESULT = result
     return result
 
 

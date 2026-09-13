@@ -13,8 +13,12 @@ def find_skills():
     skills = {}
     for directory in SKILL_DIRS:
         for path in sorted(directory.glob("*/SKILL.md")):
-            _, frontmatter, _ = path.read_text().split("---", 2)
-            meta = yaml.safe_load(frontmatter)
+            parts = path.read_text(encoding="utf-8", errors="replace").split("---", 2)
+            if len(parts) != 3:
+                continue  # no frontmatter; not a valid skill
+            meta = yaml.safe_load(parts[1])
+            if not isinstance(meta, dict) or "name" not in meta or "description" not in meta:
+                continue
             description = " ".join(meta["description"].split())
             skills[meta["name"]] = {"description": description, "path": path}
     return skills
@@ -37,6 +41,7 @@ def skills_prompt():
 
 def read_skill(name: str) -> str:
     """Open a skill and return its full instructions."""
-    if name not in SKILLS:
+    skills = _get_skills()
+    if name not in skills:
         return f"No skill named '{name}'."
-    return SKILLS[name]["path"].read_text()
+    return skills[name]["path"].read_text(encoding="utf-8")

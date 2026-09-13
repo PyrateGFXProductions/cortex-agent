@@ -27,10 +27,10 @@ if (-not (Test-Path $EnvFile)) {
 # cortex-agent configuration
 # OpenRouter (recommended): https://openrouter.ai/keys
 BASE_URL=https://openrouter.ai/api/v1
-API_KEY=sk-or-your-key-here
+# API_KEY=  (run `cortex-agent` - the setup wizard will ask, or paste your key here)
 
 # Optional — defaults shown
-# MODEL=deepseek/deepseek-chat-v3-0324
+# MODEL=deepseek/deepseek-v4-flash
 # CONTEXT_WINDOW=128000
 "@ | Set-Content -Path $EnvFile -Encoding UTF8
     Write-Host "==> Created $EnvFile — edit it to add your API key" -ForegroundColor Green

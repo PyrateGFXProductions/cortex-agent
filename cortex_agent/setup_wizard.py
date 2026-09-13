@@ -18,7 +18,7 @@ PROVIDERS = {
         "OpenRouter  (recommended — one key, access to every model)",
         "https://openrouter.ai/api/v1",
         "https://openrouter.ai/keys",
-        "deepseek/deepseek-chat-v3-0324",
+        "deepseek/deepseek-v4-flash",
     ),
     "2": (
         "OpenAI  (GPT-4o, o3, etc.)",
@@ -44,8 +44,11 @@ PROVIDERS = {
 def _already_configured() -> bool:
     """Return True if BASE_URL and API_KEY are already available."""
     # config.py already loaded the env file into os.environ at import time,
-    # so we just check the environment directly.
-    return bool(os.environ.get("BASE_URL")) and bool(os.environ.get("API_KEY"))
+    # so we just check the environment directly. The installer's placeholder
+    # key is not a real credential - treat it as unconfigured so the wizard
+    # runs instead of silently failing every request with an auth error.
+    key = os.environ.get("API_KEY", "").strip()
+    return bool(os.environ.get("BASE_URL")) and bool(key) and key != "sk-or-your-key-here"
 
 
 def _print_banner():

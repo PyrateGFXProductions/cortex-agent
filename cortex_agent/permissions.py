@@ -89,6 +89,18 @@ def split_command(command):
     return [part.strip() for part in parts if part.strip()]
 
 
+def _unsafe(part: str) -> bool:
+    """True if a part uses shell constructs that let a benign-looking prefix
+    smuggle a side effect past the allow-list: command substitution (`$(...)`,
+    backticks) and file redirection (`>`, `>>`, `<`, `<<`).
+
+    An `echo *` allow-rule must not authorise `echo $(rm -rf ~)` or
+    `echo hi > /etc/hosts`, so anything using these is never a silent pass -
+    it becomes a question for the user.
+    """
+    return ("$(" in part) or ("`" in part) or ("<" in part) or (">" in part)
+
+
 def decide(command):
     """Rate every part of a compound command; the strictest verdict wins."""
     verdicts = []
@@ -97,6 +109,8 @@ def decide(command):
         for pattern, rule in BASH_RULES.items():
             if fnmatch(part, pattern):
                 action = rule
+        if action == "allow" and _unsafe(part):
+            action = "ask"
         verdicts.append(action)
 
     for strictest in ("deny", "ask"):

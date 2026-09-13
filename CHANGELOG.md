@@ -24,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - pyproject.toml metadata (author, classifiers, URLs, keywords)
 - Added LICENSE, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT
+- `skills.py`: SKILL.md files are read as UTF-8 and malformed skills are skipped, fixing a startup crash on Windows when a skill contained non-ASCII text
+- `skills.py`: `read_skill` now works (was raising `NameError: name 'SKILLS' is not defined`)
+
+### Changed
+- `subagent.py`: `write_file` is now withheld from subagents, making them structurally read-only as documented
+- `install.sh` / `install.ps1`: write a commented-out `API_KEY` instead of a placeholder key, so the first-run setup wizard runs as intended
+- `setup_wizard.py`: treat the installer's placeholder key (`sk-or-your-key-here`) as "not configured"
+
+### Security
+- `permissions.py`: a command using command substitution (`$(...)`, backticks) or file redirection (`>`, `<`) is no longer silently allowed — it prompts the user
+- `mcp_server.py`: fail-closed permission model — an "ask" verdict is refused rather than allowed, and `write_file`/`str_replace` are now confined to the project directory
 
 ## [0.2.0] - 2024-01-15
 

@@ -25,10 +25,10 @@ if [ ! -f "$ENV_FILE" ]; then
 # cortex-agent configuration
 # OpenRouter (recommended): https://openrouter.ai/keys
 BASE_URL=https://openrouter.ai/api/v1
-API_KEY=sk-or-your-key-here
+# API_KEY=  (run `cortex-agent` - the setup wizard will ask, or paste your key here)
 
 # Optional — defaults shown
-# MODEL=deepseek/deepseek-chat-v3-0324
+# MODEL=deepseek/deepseek-v4-flash
 # CONTEXT_WINDOW=128000
 EOF
   echo "==> Created $ENV_FILE — edit it to add your API key"

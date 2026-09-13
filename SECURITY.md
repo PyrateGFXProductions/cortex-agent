@@ -45,8 +45,14 @@ Out of scope:
 
 ### Permissions
 - Bash commands: allow/deny/ask rules
-- File writes outside project: prompt required
-- MCP server: no API key required, local tools only
+- Commands using command substitution (`$(...)`, backticks) or file redirection (`>`, `<`) are never silently allowed — they prompt the user
+- File writes outside the project: prompt required (CLI) / refused (MCP)
+- MCP server: fail-closed — anything that would prompt in the CLI is refused; no API key required, local tools only
+
+### Operating environment
+- **Windows**: there is no kernel sandbox. On Windows the permission rules are the only
+  boundary, so treat the allow-list as advisory and prefer running untrusted agent
+  workloads on macOS or Linux.
 
 ### API Keys
 - Stored in `~/.agents/env` (user-controlled, not committed)

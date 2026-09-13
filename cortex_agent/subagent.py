@@ -26,13 +26,10 @@ MAX_TURNS = 12  # a runaway explorer is worse than a missing answer
 # --- rule 2 -----------------------------------------------------------------
 # `task` would let a subagent spawn subagents, forever. `write_todos` writes to
 # a module global that belongs to the main agent's plan, and this one is a
-# guest in someone else's session. Everything else it gets.
-#
-# Note this is a *structural* guarantee - those tools are simply not in the
-# list it is offered, so it cannot call them. The "do not edit files" rule in
-# the prompt below is only asking nicely. To make that one structural too, add
-# write_file and str_replace to this set.
-WITHHELD = {"task", "write_todos", "str_replace", "write"}
+# guest in someone else's session. `write_file` and `str_replace` make the
+# "do not edit files" rule structural instead of relying on the prompt asking
+# nicely. Everything else it gets.
+WITHHELD = {"task", "write_todos", "str_replace", "write_file"}
 
 
 SYSTEM_PROMPT = f"""

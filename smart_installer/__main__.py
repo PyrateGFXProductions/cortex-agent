@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("target", help="path to the client source tree to inspect/patch")
     p.add_argument("--apply", action="store_true", help="apply a known client recipe (default: probe only)")
-    p.add_argument("--dry-run", action="store_true", help="with --apply: show edits without writing (default on)")
+    p.add_argument("--dry-run", action="store_true", help="with --apply: show edits without writing (off by default — a bare --apply writes)")
     p.add_argument("--pattern", action="append", choices=sorted(BY_ID), help="only run these patterns (repeatable)")
     p.add_argument("--probe-only", action="store_true", help="only assess pattern status, no edits/recipe")
     p.add_argument("--guide", action="store_true", help="print porting instructions per pattern")

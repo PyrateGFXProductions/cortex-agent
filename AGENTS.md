@@ -106,6 +106,10 @@ Config file locations:
 - **Cursor** — `~/.cursor/mcp.json`
 - **Windsurf** — `~/.codeium/windsurf/mcp_settings.json`
 
+The MCP server is **fail-closed**: there is no interactive approval, so any call that
+would prompt in the CLI is refused instead, and `write_file`/`str_replace` are confined
+to the directory the server was launched from. Use the interactive CLI for full control.
+
 ## What this fork adds over upstream
 
 ### New: MCP server
@@ -125,6 +129,16 @@ Cursor, Windsurf, VS Code via Continue) can call these tools directly with no AP
 | `history.py` | `locked()` result cached by message list length (O(1) for append-only sessions). `sweep()` registered via `atexit` so spill files clean up on crash. |
 | `session.py` | `all_sessions()` no longer replays entire JSONL files for titles; stops at first user message. |
 | `tools.py` | `str_replace` uses `find()`-based single-pass validation instead of `count()` + `replace()` double-scan. |
+| `skills.py` | `SKILL.md` files read as UTF-8; malformed skills skipped instead of crashing startup. |
+
+### Security hardening
+
+| File | What changed |
+|---|---|
+| `permissions.py` | Commands using command substitution (`$(...)`, backticks) or file redirection (`>`, `<`) can no longer be silently allowed — they fall back to a prompt. |
+| `mcp_server.py` | Fail-closed permission gate (`_gate`): an "ask" verdict is refused rather than allowed, and `write_file`/`str_replace` are confined to the project directory. |
+| `subagent.py` | `write_file` withheld from subagents — the "read-only tools" guarantee is now structural, not just a prompt instruction. |
+| `setup_wizard.py` | The installer's placeholder API key is treated as "not configured" so the wizard runs instead of silently failing every request. |
 
 ### Package renamed
 `neuralcode` → `cortex_agent` (Python package) / `cortex-agent` (CLI command).

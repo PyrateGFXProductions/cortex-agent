@@ -57,6 +57,17 @@ mcp = FastMCP(
 )
 
 
+def _gate(name: str, args: dict) -> str | None:
+    """Run the same permission check the interactive CLI uses, but fail closed
+    on 'ask' — an MCP client has no human to prompt, so anything that would
+    interrupt the CLI is refused here rather than silently allowed.
+    Returns None when allowed, or a 'Blocked by policy' message."""
+    action, reason = check(name, args)
+    if action == "allow":
+        return None
+    return f"Blocked by policy: {reason}"
+
+
 @mcp.tool()
 def bash(command: str) -> str:
     """Run a shell command and return its combined stdout and stderr.
@@ -64,11 +75,9 @@ def bash(command: str) -> str:
     Output is capped at 10,000 characters. For large outputs, use
     head, tail, or grep to page through the result.
     """
-    action, reason = check("bash", {"command": command})
-    if action == "deny":
-        return f"Blocked by policy: {reason}"
-    # MCP clients have no interactive approval — treat 'ask' as allow.
-    # Users who want stricter control should run the interactive CLI instead.
+    blocked = _gate("bash", {"command": command})
+    if blocked:
+        return blocked
     try:
         result = sandbox_run(command)
         return cap((result.stdout + result.stderr) or "(no output)")
@@ -95,6 +104,9 @@ def read_file(path: str) -> str:
 @mcp.tool()
 def write_file(path: str, content: str) -> str:
     """Create a file, or overwrite it if it already exists."""
+    blocked = _gate("write_file", {"path": path})
+    if blocked:
+        return blocked
     try:
         with open(path, "w") as f:
             f.write(content)
@@ -110,6 +122,9 @@ def str_replace(path: str, old_str: str, new_str: str, allow_multi_edit: bool = 
     old_str must appear exactly once unless allow_multi_edit is true.
     Include surrounding lines to make the match unique.
     """
+    blocked = _gate("str_replace", {"path": path})
+    if blocked:
+        return blocked
     try:
         with open(path) as f:
             content = f.read()

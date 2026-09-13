@@ -96,7 +96,7 @@ uv run cortex-agent
 
 ### One-command installer
 
-`install.sh` / `install.ps1` install the package (with the MCP adapter) as a `uv` tool and create `~/.agents/env` with your API credentials:
+`install.sh` / `install.ps1` install the package (with the MCP adapter) as a `uv` tool and create `~/.agents/env`. On first run, `cortex-agent` launches an interactive setup wizard that walks you through picking a provider and entering your API key — no manual file editing required:
 
 ```bash
 # macOS / Linux
@@ -147,6 +147,10 @@ Add to your MCP client config:
 | **Windsurf** | `~/.codeium/windsurf/mcp_settings.json` |
 
 The MCP server exposes: `bash`, `read_file`, `write_file`, `str_replace`, `read_skill`.
+
+The MCP server is **fail-closed**: there is no interactive approval, so any command that
+would prompt in the CLI is refused instead, and `write_file`/`str_replace` are confined to
+the directory the server was launched from. Use the interactive CLI for full control.
 
 ---
 
