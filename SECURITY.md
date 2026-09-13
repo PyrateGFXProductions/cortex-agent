@@ -28,14 +28,13 @@ You will receive acknowledgment within 48 hours. We aim to provide a fix timelin
 
 This policy covers:
 - The `cortex-agent` Python package
-- The smart installer (`smart_installer/`)
-- The WSL2 setup script
+- The smart installer patcher (`smart_installer/`)
 - MCP server (`cortex_agent/mcp_server.py`)
 
 Out of scope:
 - Third-party dependencies (report to their maintainers)
 - User configuration files (`~/.agents/env`)
-- Local LLM stacks installed via smart installer (vLLM, Ollama, llama.cpp)
+- The code of external clients that `smart_installer/` patches (each repo's own policy applies)
 
 ## Security Considerations
 
@@ -53,10 +52,10 @@ Out of scope:
 - Stored in `~/.agents/env` (user-controlled, not committed)
 - Never logged or transmitted except to configured provider
 
-### Local LLM Stack (Smart Installer)
-- Runs locally, no external API calls for inference
-- Model downloads from Hugging Face (HTTPS, verified)
-- LMCache offloads to local CPU RAM/disk only
+### Smart Installer (`smart_installer/`)
+- Probes and patches **source code only**; it never downloads or installs binaries
+- Requires a git checkout before editing (unless `--force`); edits are backed up
+- `--dry-run` shows exact diffs and writes nothing
 
 ## Disclosure Timeline
 

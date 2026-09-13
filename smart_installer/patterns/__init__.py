@@ -1,0 +1,1 @@
+"""Efficiency pattern definitions and registry."""

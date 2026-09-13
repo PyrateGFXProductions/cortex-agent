@@ -2,7 +2,7 @@
 
 This document captures the core efficiency mechanisms from cortex-agent that can be ported into any AI coding client (opencode, hermes, claude-code, aider, etc.).
 
-Cortex-agent is no longer just a standalone agent — it's a **reference implementation of context-window efficiency patterns** that other clients can adopt.
+Cortex-agent is no longer just a standalone agent — it's a **reference implementation of context-window efficiency patterns** that other clients can adopt. The bundled smart installer (`smart_installer/`) can probe a client's source tree, show porting guidance, and apply a verified recipe automatically.
 
 ---
 
@@ -223,27 +223,31 @@ def get_profile(hw):
 
 ---
 
-## Pattern 7: Interactive Smart Installation
+## Patcher Reference: Smart Installer
 
-**What:** Cross-platform installer that detects hardware, presents options interactively, and installs the optimal local LLM stack (vLLM+LMCache, Ollama, or llama.cpp) with full user control.
+`smart_installer/` is a **source-code patcher** that implements these
+patterns into any AI coding client. It is not an LLM-stack installer — it
+patches client source code, using the six patterns above as its library.
 
-**Why:** Installing local LLM stacks is complex (CUDA, ROCm, WSL2, quantization choices). Users need guidance without being forced into decisions.
+- **Probe** (`python -m smart_installer <client-tree>`) — assesses each pattern
+  and reports `applied / partial / absent` with the hook points found.
+- **Guide** (`--guide`) — prints per-pattern porting instructions tuned to the
+  detected language.
+- **Recipe apply** (`--apply --dry-run` / `--apply`) — applies a verified,
+  idempotent edit-plan for a known client (opencode is shipped), with
+  git-checkout safety, timestamped backups, and per-edit marker checks.
 
-**Features:**
-- Hardware detection → recommends optimal stack
-- Interactive prompts for every component (CUDA, ROCm, Python venv, models, services)
-- User confirms each step — nothing installs without explicit "yes"
-- Generates client configs for cortex-agent, opencode, Continue.dev
-- Creates system services (systemd, launchd, Task Scheduler)
+Structure:
 
-**Usage:**
-```bash
-# Auto-detect and install interactively
-python smart_installer/smart_install.py
+- `core/target.py` — client detection + source-tree index
+- `detect/` — client / language detection
+- `patterns/library.py` — the six probes (the plugin API)
+- `recipes/` — per-client `EditPlan`s; opencode is the shipped reference
+- `engine.py` — dry-run, backup, idempotent apply, diff preview
+- `__main__.py` — CLI
 
-# Preview what would happen
-python smart_installer/smart_install.py --dry-run --no-rich
-```
+Adding a new client = one recipe function in `recipes/__init__.py`
+(see `smart_installer/README.md`).
 
 ---
 
@@ -257,13 +261,13 @@ python smart_installer/smart_install.py --dry-run --no-rich
 | Subagent isolation | agent factory, tool registry, task tool | Medium |
 | File staleness | file read tool, injection builder | Low |
 | Hardware-aware config | config loader, hardware detection, defaults | Medium |
-| Smart installer | separate project (reference only) | N/A |
 
 ---
 
 ## Reference Implementation: Opencode Patch
 
-The opencode patch at `../opencode-efficiency-patch/` (private) demonstrates all patterns applied to a real client:
+The opencode recipe in `smart_installer/recipes/` is encoded from a tested Go
+patch and reproduces all six patterns against a real client:
 
 - `internal/message/message.go`: StripToolResults, locked prefix finder
 - `internal/llm/agent/agent.go`: late injection, turn-loop compaction trigger, maxTurns
@@ -275,17 +279,6 @@ The opencode patch at `../opencode-efficiency-patch/` (private) demonstrates all
 - `internal/config/config.go`: **New** — hardware-aware defaults via `applyHardwareDefaults()`
 - `internal/filetrack/tracker.go`: **New** — file staleness detection via `os.stat(mtime, size)`
 - `internal/filetrack/global.go`: **New** — global tracker for file read recording
-
----
-
-## Additional: Smart Installer (Reference Implementation)
-
-`smart_installer/` — Cross-platform interactive installer:
-
-- `hardware_detect.py` — Cross-platform GPU/CPU/RAM/OS detection
-- `interactive.py` — Rich/text UI with prompts, tables, confirmations
-- `smart_install.py` — Main orchestrator with step-by-step flow
-- Wrappers: `smart-install.sh` (Linux/macOS), `smart-install.ps1` (Windows)
 
 ---
 

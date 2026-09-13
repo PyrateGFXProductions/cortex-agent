@@ -8,17 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Hardware-aware automatic configuration for local LLM stacks
-- Smart installer with interactive UI and hardware detection
-- WSL2 + vLLM + LMCache setup for Windows
-- File staleness detection via `os.stat(mtime, size)`
-- Opencode patch (private) with all 5 efficiency patterns
+- Smart installer (`smart_installer/`) — source-code patcher that implements the six efficiency patterns into any AI coding client
+- Opencode reference recipe (probe + apply, idempotent, dry-run/backup-safe)
+- Hardware-aware automatic configuration pattern
+- File staleness detection via `os.stat(mtime, size)` (opencode recipe)
+- Fixed import-time crash in `cortex_agent/llm.py` — system prompt is now built lazily
 
 ### Changed
 - Renamed package from `neuralcode` to `cortex_agent`
 - Updated description to "Reference implementation of context-window efficiency patterns"
 - Moved AVB attribution to Credits section
 - Replaced Patreon with Ko-Fi support link
+- Removed the LLM-stack installer scope (WSL2/vLLM setup, smart-install wrappers) — the smart installer now patches client source code only
 
 ### Fixed
 - pyproject.toml metadata (author, classifiers, URLs, keywords)

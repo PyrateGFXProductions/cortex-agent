@@ -15,15 +15,16 @@ The standalone agent (`uv run cortex-agent`) still works and demonstrates all pa
 
 ## Efficiency Patterns (Portable to Any Client)
 
-See [`EFFICIENCY_PATTERNS.md`](EFFICIENCY_PATTERNS.md) for the five core patterns:
+See [`EFFICIENCY_PATTERNS.md`](EFFICIENCY_PATTERNS.md) for the six core patterns:
 
 1. **Locked Prefix + Late Injection** — preserve prompt cache by never mutating cached messages; inject env context ephemerally at send time
 2. **Three-Tier Tool Output Degradation** — cap (10K) → strip (300 chars) → drop (emergency)
 3. **Compaction with Prefix Rebuild** — summarize at 85% full, rebuild to 35%, new prefix cached
 4. **Isolated Subagents** — fresh context window, read-only tools, 12-turn cap, only final answer returns
 5. **File Staleness Detection** — `os.stat(mtime, size)` diff per turn, warn on stale reads
+6. **Hardware-Aware Automatic Configuration** — detect GPU/CPU/RAM at startup, set optimal context/limits by profile
 
-These patterns are language-agnostic. The reference implementation is in `cortex_agent/`; the opencode port is in `../opencode-efficiency-patch/` (private).
+These patterns are language-agnostic. The reference implementation is in `cortex_agent/`; `smart_installer/` probes a target client's source tree, prints porting guidance, and applies a verified recipe (opencode shipped) automatically.
 
 ## Architecture
 
@@ -64,28 +65,23 @@ uv run cortex-agent
 
 ## Installation Methods
 
-See [README.md#installation-methods](README.md#installation-methods) for comprehensive options:
+See [README.md#installation-methods](README.md#installation-methods):
 
-| Method | Best For |
-|--------|----------|
-| **Standard (uv)** | Local development, contributing |
-| **Docker** | CI/CD, reproducible envs, isolation |
-| **Package Managers** (Homebrew, Scoop, Chocolatey, AUR, Nix) | Quick system-wide install |
-| **Binary Releases** | Air-gapped, no toolchain, CI runners |
-| **Kubernetes/Helm** | Production, team clusters, GitOps |
-| **Devcontainers** | VS Code Remote, Codespaces, team consistency |
-| **Cloud GPU** (RunPod, Lambda, Modal) | No local GPU, burst workloads |
-| **Air-gapped/Offline** | Secure/classified environments |
-| **Multi-user/Shared** | Team servers, shared GPU nodes |
+| Method | Best For | Command |
+|--------|----------|---------|
+| **uv (dev)** | Local development, contributing | `uv sync && uv run cortex-agent` |
+| **uv tool (standard)** | System-wide install | `uv tool install ".[mcp]"` |
+| **One-command installer** | Guided setup + `~/.agents/env` | `./install.sh` or `.\install.ps1` |
+| **pip** | Existing environment | `pip install .` (or `.[mcp]`) |
+| **PyInstaller binary** | Standalone binary from source | `uv run pyinstaller cortex-agent.spec` |
 
 **Quick decision:**
 - Local dev → `uv sync`
-- CI/reproducible → Docker
-- No build → Binary/Package manager
-- Production K8s → Helm
-- Remote dev → Devcontainer
-- No GPU → Cloud GPU
-- Offline → Air-gapped bundle
+- System-wide → `uv tool install`
+- First-time setup → `./install.sh` / `.\install.ps1`
+- Standalone binary → `pyinstaller cortex-agent.spec`
+
+> Docker images, package-manager packages, and prebuilt release binaries are planned but not published yet.
 
 ## MCP (use with Claude Desktop, Cursor, Windsurf, etc.)
 
@@ -142,21 +138,40 @@ All imports are relative so renaming touched only `pyproject.toml` and two strin
 
 ---
 
-## Enhanced: Hardware-Aware Configuration (opencode patch)
+## Enhanced: Smart Installer (new)
 
-The private opencode patch at `../opencode-efficiency-patch/` adds **hardware-aware automatic configuration** that detects your GPU/CPU/RAM and sets optimal defaults:
+`smart_installer/` — a **source-code patcher** that implements the six
+efficiency patterns into any AI coding client. It patches client source
+(Go, Python, TypeScript, Rust — wherever the agent loop lives), it does not
+install LLM stacks.
 
-| Hardware Profile | GPU VRAM | System RAM | Stack | Context | Quantization | CPU Offload |
-|---|---|---|---|---|---|---|
-| High-End | ≥24GB | ≥64GB | vLLM+LMCache | 128K+ | FP16 | 64GB |
-| Mid-Range | 8-24GB | 32-64GB | vLLM+LMCache | 32-64K | FP16/8-bit | 32GB |
-| Entry | 4-8GB | 16-32GB | vLLM+LMCache | 16-32K | 4-bit/8-bit | 16GB |
-| Apple Silicon | Unified | ≥32GB | Ollama | 32K | Q4_K_M | 50% RAM |
-| CPU Only | None | ≥16GB | llama.cpp | 8-16K | Q4_K_M | N/A |
+### What it does
 
-### Opencode Patch Enhancements
+- **Probe** — `python -m smart_installer <client-tree>` assesses which
+  patterns already exist (`applied / partial / absent`) with hook points.
+- **Guide** — `--guide` prints per-pattern porting instructions tuned to the
+  detected language.
+- **Recipe apply** — `--apply` applies a verified idempotent edit-plan for a
+  known client. opencode is the shipped reference recipe; new clients are one
+  recipe function in `smart_installer/recipes/__init__.py`.
+- **Safe by default** — dry-run previews diffs, git-checkout required (unless
+  `--force`), timestamped backups, re-run is a no-op (idempotent).
 
-The patch applies all 5 efficiency patterns to opencode (Go):
+### Usage
+
+```bash
+python -m smart_installer ../opencode                 # probe
+python -m smart_installer ../opencode --guide         # porting instructions
+python -m smart_installer ../opencode --apply --dry-run  # preview diffs
+python -m smart_installer ../opencode --apply         # apply for real
+```
+
+See `smart_installer/README.md` for the plugin API and safety semantics.
+
+### Opencode Patch (reference recipe)
+
+The recipe in `smart_installer/recipes/` is encoded from a tested Go patch
+that applies all six patterns to opencode:
 
 | Component | Enhancement |
 |---|---|
@@ -175,71 +190,16 @@ The patch applies all 5 efficiency patterns to opencode (Go):
 
 ---
 
-## Enhanced: Smart Installer (new)
-
-`smart_installer/` — **Cross-platform interactive installer** that detects hardware and installs the optimal local LLM stack with LMCache.
-
-### Features
-- **Hardware detection** — GPU vendor/model/VRAM, CPU, RAM, OS
-- **Interactive stack selection** — vLLM+LMCache (NVIDIA/AMD GPU), Ollama (Apple Silicon/Windows), llama.cpp (CPU-only)
-- **User-controlled** — Every step asks for confirmation; nothing installs without explicit "yes"
-- **Auto-configures** — Context window, GPU memory, CPU offload, quantization based on hardware
-- **Generates client configs** — cortex-agent, opencode, Continue.dev, generic OpenAI-compatible
-- **Creates services** — systemd (Linux/WSL2), launchd (macOS), Task Scheduler (Windows)
-
-### Usage
-```bash
-# Linux/macOS
-./smart-install.sh
-
-# Windows PowerShell
-.\smart-install.ps1
-
-# Preview only
-python smart_installer/smart_install.py --dry-run --no-rich
-```
-
-### Output
-Installs to `~/.llm-stack/` with:
-- Python venv + PyTorch + vLLM/Ollama/llama.cpp + LMCache
-- Optimized configs (vLLM, LMCache, Ollama, llama.cpp)
-- Launch scripts (`start.sh` / `start.ps1`)
-- System service files (systemd / launchd)
-- Client configs for cortex-agent, opencode, Continue.dev
-
----
-
-## WSL2 + vLLM + LMCache Setup (Windows)
-
-For Windows users wanting vLLM + LMCache (which requires Linux):
-
-See [`WSL2-LMCACHE-SETUP.md`](WSL2-LMCACHE-SETUP.md) for a one-command PowerShell script that:
-1. Installs WSL2 Ubuntu 24.04 with GPU passthrough
-2. Configures 24GB RAM / 8GB swap via `.wslconfig`
-3. Installs PyTorch CUDA 12.1, vLLM, LMCache in a venv
-4. Creates systemd service for auto-start
-5. Exposes API at `http://localhost:8000/v1`
-
-Run:
-```powershell
-.\setup-wsl2-lmcache.ps1          # First run: installs WSL2, prompts reboot
-.\setup-wsl2-lmcache.ps1 -SkipWSLInstall  # After reboot: completes inside WSL
-```
-
----
-
 ## Credits & Attribution
 
 This project builds on exceptional work from the open-source community. Full attribution in [README.md#credits--attribution](README.md#credits--attribution).
 
-**Key dependencies:**
+**Project dependencies:** `openai`, `prompt-toolkit`, `rich`, `pyyaml` (runtime); `mcp` (optional). No LLM inference stack is bundled or installed — the agent talks to any OpenAI-compatible endpoint (`BASE_URL`), including optionally self-hosted vLLM/Ollama/llama.cpp backends.
+
+**Built on:**
 - **Base fork:** [avbiswas/neural-code](https://github.com/avbiswas/neural-code) by **AVB** — original agent harness + Neural Breakdown tutorial
 - **opencode** — Go agent architecture reference for efficiency pattern port
-- **vLLM** — PagedAttention inference engine
-- **LMCache** — KV cache offloading layer
-- **Ollama** — Native cross-platform LLM runner
-- **llama.cpp** — CPU/GPU GGUF inference engine
-- **PyTorch, Rich, Prompt Toolkit, uv** — Python ecosystem foundations
+- **vLLM / LMCache / Ollama / llama.cpp** — optional self-hosted inference backends the agent can point at (referenced by the hardware-aware config pattern)
 - **MCP (Anthropic)** — Model Context Protocol for tool exposure
 
 ---
